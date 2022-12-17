@@ -1,7 +1,9 @@
 use macroquad::prelude::*;
+
 use std::{thread, time};
 
 const PI: f64 = 3.1415926536;
+const SPEED: f64 = 1.0;
 
 // function for the right hand side of the equation
 fn right_hand_side (theta: f64, phi: f64, p: f64, q: f64, omega2: f64) -> [f64; 5] {
@@ -18,13 +20,40 @@ fn right_hand_side (theta: f64, phi: f64, p: f64, q: f64, omega2: f64) -> [f64; 
     [theta_dot, phi_dot, p_dot, q_dot, h]
 }
 
+fn get_window_par (height: f32, width: f32) -> [f32; 4] {
+    let l = height / 5.0;
+    let w = width / 100.0;
+    let x0 = width / 2.0;
+    let y0 = height / 2.0;
+    [l, w, x0, y0]
+}
+
+fn draw_pendulum (theta: f64, phi: f64, par: [f32; 4]) {
+    // calculate and plot pendulum positions
+    let l = par[0];
+    let w = par[1];
+    let x0 = par[2];
+    let y0 = par[3];
+
+    let x1 = x0 - l * (theta.sin() as f32);
+    let y1 = y0 + l * (theta.cos() as f32);
+    let x2 = x1 - l * (phi.sin() as f32);
+    let y2 = y1 + l * (phi.cos() as f32);
+
+    draw_line(x0, y0, x1, y1, w, BLACK);
+    draw_line(x1, y1, x2, y2, w, BLACK);
+    draw_circle(x0, y0, w, BLACK);
+    draw_circle(x1, y1, w, BLUE);
+    draw_circle(x2, y2, w, RED);
+}
+
 #[macroquad::main("Double Pendulum")]
 async fn main() {
 
     // pendulum parameters
-    let omega = 2.0;
+    let period = 2.0;
+    let omega = 2.0 * PI / period;
     let omega2 = omega * omega;
-    let period = 2.0 * PI / omega;
 
     // time parameters
     let tf = 100.0 * period;
@@ -48,7 +77,43 @@ async fn main() {
     //total energy
     let mut h = right_hand_side(theta_0, phi_0, p_0, q_0, omega2)[4];
 
-    // apply initial conditions
+    // draw the pendulum initial state
+    
+    while !is_key_down(KeyCode::Space) {
+        clear_background(LIGHTGRAY);
+
+        let par = get_window_par(screen_height(), screen_width());
+
+        draw_pendulum(theta_0, phi_0, par);
+
+        let w = par[1];
+
+        draw_text(format!("Press SPACE to start or move the pendulum!").as_str(), 5.0 * w, 5.0 * w, 3.0 * w, BLACK);
+        draw_text(format!("Use left/right or up/down arrows to move it!").as_str(), 5.0 * w, 10.0 * w, 3.0 * w, BLACK);
+        
+        let ft = get_frame_time() as f64;
+
+        if !is_key_down(KeyCode::Left) {
+            theta_0 = theta_0 + SPEED * ft;
+        }
+
+        if !is_key_down(KeyCode::Right) {
+            theta_0 = theta_0 - SPEED * ft;
+        }
+
+        if !is_key_down(KeyCode::Down) {
+            phi_0 = phi_0 + SPEED * ft;
+        }
+
+        if !is_key_down(KeyCode::Up) {
+            phi_0 = phi_0 - SPEED * ft;
+        }
+
+
+        next_frame().await;
+    }
+
+    // introduce the state variables
     let mut theta: f64;
     let mut phi: f64;
     let mut p: f64;
@@ -71,27 +136,14 @@ async fn main() {
 
             clear_background(LIGHTGRAY);
 
-            // calculate and plot pendulum positions
-            let l = screen_height() / 5.0;
-            let w = screen_width() / 100.0;
-            let x0 = screen_width() / 2.0;
-            let y0 = screen_height() / 2.0;
+            let par = get_window_par(screen_height(), screen_width());
+            let w = par[1];
 
-            let x1 = x0 - l * (theta_0.sin() as f32);
-            let y1 = y0 + l * (theta_0.cos() as f32);
-            let x2 = x1 - l * (phi_0.sin() as f32);
-            let y2 = y1 + l * (phi_0.cos() as f32);
+            draw_pendulum(theta_0, phi_0, par);
 
-        
-            draw_line(x0, y0, x1, y1, w, BLACK);
-            draw_line(x1, y1, x2, y2, w, BLACK);
-            draw_circle(x0, y0, w, BLACK);
-            draw_circle(x1, y1, w, BLUE);
-            draw_circle(x2, y2, w, RED);
             draw_text(format!("Time elapsed: {}", t_0).as_str(), 5.0 * w, 5.0 * w, 3.0 * w, BLACK);
             draw_text(format!("Total energy: {}", h).as_str(), 5.0 * w, 10.0 * w, 3.0 * w, BLACK);
-
-
+       
             next_frame().await;
         }
         
