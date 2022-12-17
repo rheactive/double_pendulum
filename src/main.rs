@@ -1,9 +1,29 @@
 use macroquad::prelude::*;
 
 use std::{thread, time};
+use std::fs;
+use std::io::{Write};
+use std::path::{PathBuf};
 
 const PI: f64 = 3.1415926536;
 const SPEED: f64 = 1.0;
+
+// express angle in degrees
+fn angle_in_degrees (angle: f64) -> f64 {
+    let in_degrees;
+    if angle > 2.0 * PI {
+        let full_angles = (angle / (2.0 * PI)) as u32;
+        in_degrees = angle * 180.0 / PI - ((360 * full_angles) as f64)
+    } else {
+        if angle < - 2.0 * PI {
+            let full_angles = (- angle / (2.0 * PI)) as u32;
+            in_degrees = angle * 180.0 / PI + ((360 * full_angles) as f64)
+        } else {
+            in_degrees = angle * 180.0 / PI
+        }
+    }
+    in_degrees
+}
 
 // function for the right hand side of the equation
 fn right_hand_side (theta: f64, phi: f64, p: f64, q: f64, omega2: f64) -> [f64; 5] {
@@ -50,6 +70,12 @@ fn draw_pendulum (theta: f64, phi: f64, par: [f32; 4]) {
 #[macroquad::main("Double Pendulum")]
 async fn main() {
 
+    // file for data
+    //file for nanostructures data
+    let fl_name = "double_pendulum.dat";
+        let file_path: PathBuf = [fl_name].iter().collect();
+        let mut my_file = fs::File::create(file_path).expect("Error creating file");
+
     // pendulum parameters
     let period = 2.0;
     let omega = 2.0 * PI / period;
@@ -88,8 +114,8 @@ async fn main() {
 
         let w = par[1];
 
-        draw_text(format!("Press SPACE to start or move the pendulum!").as_str(), 5.0 * w, 5.0 * w, 3.0 * w, BLACK);
-        draw_text(format!("Use left/right or up/down arrows to move it!").as_str(), 5.0 * w, 10.0 * w, 3.0 * w, BLACK);
+        draw_text(format!("Use left/right or up/down arrows to move the pendulum!").as_str(), 5.0 * w, 5.0 * w, 3.0 * w, BLACK);
+        draw_text(format!("Press SPACE to start!").as_str(), 5.0 * w, 10.0 * w, 3.0 * w, BLACK);
         
         let ft = get_frame_time() as f64;
 
@@ -131,7 +157,7 @@ async fn main() {
 
         t_0 = t_0 + dt;
 
-        if t_0 - t_draw > 0.04 {
+        if t_0 - t_draw > 0.016666667 {
             t_draw = t_0;
 
             clear_background(LIGHTGRAY);
@@ -141,8 +167,10 @@ async fn main() {
 
             draw_pendulum(theta_0, phi_0, par);
 
-            draw_text(format!("Time elapsed: {}", t_0).as_str(), 5.0 * w, 5.0 * w, 3.0 * w, BLACK);
-            draw_text(format!("Total energy: {}", h).as_str(), 5.0 * w, 10.0 * w, 3.0 * w, BLACK);
+            draw_text(format!("Time elapsed, seconds: {:.3}", t_0).as_str(), 5.0 * w, 5.0 * w, 3.0 * w, BLACK);
+            draw_text(format!("Total energy, arb. units: {:.5}", h).as_str(), 5.0 * w, 10.0 * w, 3.0 * w, BLACK);
+
+            writeln!(my_file, "{} {} {} {}", t_0, angle_in_degrees(theta_0), angle_in_degrees(phi_0), h).expect("Error writing to file");
        
             next_frame().await;
         }
