@@ -28,7 +28,7 @@ async fn main() {
 
     // time parameters
     let tf = 100.0 * period;
-    let dt_millis: u64 = 1;
+    let dt_millis: u64 = 5;
     let dt = 0.001 * (dt_millis as f64);
     let mut delay_millis: u64;
     
