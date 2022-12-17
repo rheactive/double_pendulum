@@ -1,4 +1,5 @@
 use macroquad::prelude::*;
+use std::{thread, time};
 
 const PI: f64 = 3.1415926536;
 
@@ -21,27 +22,31 @@ fn right_hand_side (theta: f64, phi: f64, p: f64, q: f64, omega2: f64) -> [f64; 
 async fn main() {
 
     // pendulum parameters
-    let omega = 10.0;
+    let omega = 2.0;
     let omega2 = omega * omega;
     let period = 2.0 * PI / omega;
+
+    // time parameters
+    let tf = 100.0 * period;
+    let dt_millis: u64 = 1;
+    let dt = 0.001 * (dt_millis as f64);
+    let mut delay_millis: u64;
     
     // initial conditions
     let mut t_0 = 0.0;
     let mut t_draw = 0.0;
-    let mut theta_0 = 75.0 *  PI / 180.0;
-    let mut phi_0 = 119.0 *  PI / 180.0;
+    let mut t_start = 0.0;
+    let mut t_end = 0.0;
+    
+    let mut theta_0 = 175.0 *  PI / 180.0;
+    let mut phi_0 = 90.0 *  PI / 180.0;
     let theta_dot_0 = 0.0;
-    let phi_dot_0 = 10.0;
+    let phi_dot_0 = 0.0;
     let mut p_0 = 8.0/3.0 * theta_dot_0 + phi_dot_0 * (theta_0 - phi_0).cos();
     let mut q_0 = 2.0/3.0 * phi_dot_0 + theta_dot_0 * (theta_0 - phi_0).cos();
 
     //total energy
     let mut h = right_hand_side(theta_0, phi_0, p_0, q_0, omega2)[4];
-
-    // time parameters
-    let tf = 100.0 * period;
-    let dt = 0.001 * period;
-    //let Nt = (Tf / Dt) as usize;
 
     // apply initial conditions
     let mut theta: f64;
@@ -52,10 +57,16 @@ async fn main() {
     //start the calculation
 
     while t_0 < tf {
+
+        delay_millis = (1000.0 * (t_end - t_start)) as u64;
         
+        if dt_millis > delay_millis {thread::sleep(time::Duration::from_millis(dt_millis - delay_millis))};
+
+        t_start = get_time();
+
         t_0 = t_0 + dt;
 
-        if t_0 - t_draw > 0.01 {
+        if t_0 - t_draw > 0.04 {
             t_draw = t_0;
 
             clear_background(LIGHTGRAY);
@@ -77,8 +88,8 @@ async fn main() {
             draw_circle(x0, y0, w, BLACK);
             draw_circle(x1, y1, w, BLUE);
             draw_circle(x2, y2, w, RED);
-            draw_text(format!("Time elapsed: {}", t_0).as_str(), 5.0 * w, 5.0 * w, 50.0, BLACK);
-            draw_text(format!("Total energy: {}", h).as_str(), 5.0 * w, 10.0 * w, 50.0, BLACK);
+            draw_text(format!("Time elapsed: {}", t_0).as_str(), 5.0 * w, 5.0 * w, 3.0 * w, BLACK);
+            draw_text(format!("Total energy: {}", h).as_str(), 5.0 * w, 10.0 * w, 3.0 * w, BLACK);
 
 
             next_frame().await;
@@ -111,6 +122,8 @@ async fn main() {
         q_0 = q_0 + (rk_1[3] + 2.0 * rk_2[3] + 2.0 * rk_3[3] + rk_4[3]) * dt / 6.0;
 
         h = rk_1[4];
+
+        t_end = get_time();
             
         
     }
