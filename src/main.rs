@@ -1,6 +1,5 @@
 use macroquad::prelude::*;
 
-use std::{thread, time};
 use std::fs;
 use std::io::{Write};
 use std::path::{PathBuf};
@@ -112,15 +111,16 @@ async fn main() {
 
     // time parameters
     let tf = 100.0 * period;
-    let dt_millis: u64 = 5;
+    let dt_millis: u64 = 2;
     let dt = 0.001 * (dt_millis as f64);
-    let mut delay_millis: u64;
+    // frame time
+	let mut ft: f64;
     
     // initial conditions
     let mut t_0 = 0.0;
     let mut t_draw = 0.0;
-    let mut t_start = 0.0;
-    let mut t_end = 0.0;
+    //let mut t_start = 0.0;
+    //let mut t_end = 0.0;
     
     let mut theta_0 = 175.0 *  PI / 180.0;
     let mut phi_0 = 90.0 *  PI / 180.0;
@@ -147,7 +147,7 @@ async fn main() {
         draw_text(format!("Use left/right or up/down arrows to move the pendulum!").as_str(), 5.0 * w, 5.0 * w, 3.0 * w, BLACK);
         draw_text(format!("Press SPACE to start!").as_str(), 5.0 * w, 10.0 * w, 3.0 * w, BLACK);
         
-        let ft = get_frame_time() as f64;
+        ft = get_frame_time() as f64;
 
         if !is_key_down(KeyCode::Left) {
             theta_0 = theta_0 + SPEED * ft;
@@ -196,15 +196,11 @@ async fn main() {
 
     while t_0 < tf {
 
-        delay_millis = (1000.0 * (t_end - t_start)) as u64;
-        
-        if dt_millis > delay_millis {thread::sleep(time::Duration::from_millis(dt_millis - delay_millis))};
-
-        t_start = get_time();
-
         t_0 = t_0 + dt;
+		
+		ft = get_frame_time() as f64;
 
-        if t_0 - t_draw > 0.016666667 {
+        if t_0 - t_draw > ft {
             t_draw = t_0;
 
             clear_background(LIGHTGRAY);
@@ -255,10 +251,6 @@ async fn main() {
         p_0 = p_0 + (rk_1[2] + 2.0 * rk_2[2] + 2.0 * rk_3[2] + rk_4[2]) * dt / 6.0;
         q_0 = q_0 + (rk_1[3] + 2.0 * rk_2[3] + 2.0 * rk_3[3] + rk_4[3]) * dt / 6.0;
 
-        h = rk_1[4];
-
-        t_end = get_time();
-            
-        
+        h = rk_1[4];    
     }
 }
