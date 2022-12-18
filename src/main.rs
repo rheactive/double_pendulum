@@ -22,7 +22,8 @@ fn angle_in_degrees (angle: f64) -> f64 {
             in_degrees = angle * 180.0 / PI
         }
     }
-    in_degrees
+    if in_degrees < 0.0 {360.0 + in_degrees}
+    else {in_degrees}
 }
 
 // function for the right hand side of the equation
@@ -70,10 +71,14 @@ fn draw_pendulum (theta: f64, phi: f64, par: [f32; 4]) {
 #[macroquad::main("Double Pendulum")]
 async fn main() {
 
+    //make directory
+    let dir_name = "results";
+    fs::create_dir_all(dir_name).expect("Error creating directory");
+	
     // file for data
     //file for nanostructures data
     let fl_name = "double_pendulum.dat";
-        let file_path: PathBuf = [fl_name].iter().collect();
+        let file_path: PathBuf = [dir_name, fl_name].iter().collect();
         let mut my_file = fs::File::create(file_path).expect("Error creating file");
 
     // pendulum parameters
