@@ -4,9 +4,12 @@ use std::{thread, time};
 use std::fs;
 use std::io::{Write};
 use std::path::{PathBuf};
+use std::collections::LinkedList;
 
 const PI: f64 = 3.1415926536;
 const SPEED: f64 = 1.0;
+// trail parameter
+const MEM: usize = 50;
 
 // express angle in degrees
 fn angle_in_degrees (angle: f64) -> f64 {
@@ -49,10 +52,9 @@ fn get_window_par (height: f32, width: f32) -> [f32; 4] {
     [l, w, x0, y0]
 }
 
-fn draw_pendulum (theta: f64, phi: f64, par: [f32; 4]) {
-    // calculate and plot pendulum positions
+fn find_pendulum (theta: f64, phi: f64, par: [f32; 4]) -> [f32; 4] {
+    // calculate pendulum positions
     let l = par[0];
-    let w = par[1];
     let x0 = par[2];
     let y0 = par[3];
 
@@ -61,11 +63,33 @@ fn draw_pendulum (theta: f64, phi: f64, par: [f32; 4]) {
     let x2 = x1 - l * (phi.sin() as f32);
     let y2 = y1 + l * (phi.cos() as f32);
 
-    draw_line(x0, y0, x1, y1, w, BLACK);
-    draw_line(x1, y1, x2, y2, w, BLACK);
+    [x1, y1, x2, y2]
+}
+
+fn draw_pendulum (coords: [f32; 4], par: [f32; 4]) {
+    // plot pendulum positions
+    let w = par[1];
+    let x0 = par[2];
+    let y0 = par[3];
+
+    let x1 = coords[0];
+    let y1 = coords[1];
+    let x2 = coords[2];
+    let y2 = coords[3];
+
+    draw_line(x0, y0, x1, y1, w / 2.0, BLACK);
+    draw_line(x1, y1, x2, y2, w / 2.0, BLACK);
     draw_circle(x0, y0, w, BLACK);
     draw_circle(x1, y1, w, BLUE);
-    draw_circle(x2, y2, w, RED);
+    draw_circle(x2, y2, w, MAROON);
+}
+
+fn draw_trail (xy_mem: LinkedList<(f32, f32)>, xy_last: (f32, f32), w: f32) {
+    // calculate and plot pendulum positions
+    for xy in xy_mem {
+        draw_circle(xy.0, xy.1, w / 5.0, MAROON);
+    }
+    draw_circle(xy_last.0, xy_last.1, w / 3.0, MAROON);
 }
 
 #[macroquad::main("Double Pendulum")]
@@ -114,8 +138,9 @@ async fn main() {
         clear_background(LIGHTGRAY);
 
         let par = get_window_par(screen_height(), screen_width());
+        let coords = find_pendulum(theta_0, phi_0, par);
 
-        draw_pendulum(theta_0, phi_0, par);
+        draw_pendulum(coords, par);
 
         let w = par[1];
 
@@ -150,6 +175,23 @@ async fn main() {
     let mut p: f64;
     let mut q: f64;
 
+    // Runge-Kutta coefficients
+    let mut rk_1: [f64; 5];
+    let mut rk_2: [f64; 5];
+    let mut rk_3: [f64; 5];
+    let mut rk_4: [f64; 5];
+
+    // window parameters
+    let mut par: [f32; 4];
+    let mut w: f32;
+    let mut coords: [f32; 4];
+
+    par = get_window_par(screen_height(), screen_width());
+    coords = find_pendulum(theta_0, phi_0, par);
+
+    // trail data
+    let mut xy_mem = LinkedList::from([(coords[2], coords[3]); MEM]);
+
     //start the calculation
 
     while t_0 < tf {
@@ -167,10 +209,17 @@ async fn main() {
 
             clear_background(LIGHTGRAY);
 
-            let par = get_window_par(screen_height(), screen_width());
-            let w = par[1];
+            par = get_window_par(screen_height(), screen_width());
+            w = par[1];
 
-            draw_pendulum(theta_0, phi_0, par);
+            coords = find_pendulum(theta_0, phi_0, par);
+
+            let xy_last = xy_mem.pop_back().unwrap();
+
+            xy_mem.push_front((coords[2], coords[3]));
+
+            draw_pendulum(coords, par);
+            draw_trail(xy_mem.clone(), xy_last, w);
 
             draw_text(format!("Time elapsed, seconds: {:.3}", t_0).as_str(), 5.0 * w, 5.0 * w, 3.0 * w, BLACK);
             draw_text(format!("Total energy, arb. units: {:.5}", h).as_str(), 5.0 * w, 10.0 * w, 3.0 * w, BLACK);
@@ -181,25 +230,25 @@ async fn main() {
         }
         
 
-        let rk_1 = right_hand_side(theta_0, phi_0, p_0, q_0, omega2);
+        rk_1 = right_hand_side(theta_0, phi_0, p_0, q_0, omega2);
         theta = theta_0 + rk_1[0] * dt / 2.0;
         phi = phi_0 + rk_1[1] * dt / 2.0;
         p = p_0 + rk_1[2] * dt / 2.0;
         q = q_0 + rk_1[3] * dt / 2.0;
 
-        let rk_2 = right_hand_side(theta, phi, p, q, omega2);
+        rk_2 = right_hand_side(theta, phi, p, q, omega2);
         theta = theta_0 + rk_2[0] * dt / 2.0;
         phi = phi_0 + rk_2[1] * dt / 2.0;
         p = p_0 + rk_2[2] * dt / 2.0;
         q = q_0 + rk_2[3] * dt / 2.0;
 
-        let rk_3 = right_hand_side(theta, phi, p, q, omega2);
+        rk_3 = right_hand_side(theta, phi, p, q, omega2);
         theta = theta_0 + rk_3[0] * dt;
         phi = phi_0 + rk_3[1] * dt;
         p = p_0 + rk_3[2] * dt;
         q = q_0 + rk_3[3] * dt;
 
-        let rk_4 = right_hand_side(theta, phi, p, q, omega2);
+        rk_4 = right_hand_side(theta, phi, p, q, omega2);
 
         theta_0 = theta_0 + (rk_1[0] + 2.0 * rk_2[0] + 2.0 * rk_3[0] + rk_4[0]) * dt / 6.0;
         phi_0 = phi_0 + (rk_1[1] + 2.0 * rk_2[1] + 2.0 * rk_3[1] + rk_4[1]) * dt / 6.0;
