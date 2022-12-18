@@ -1,6 +1,6 @@
 library(ggplot2)
 
-flnm <- "double_pendulum.dat"
+flnm <- "results/double_pendulum.dat"
 
 d <- read.table(flnm)
 
