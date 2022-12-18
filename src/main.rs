@@ -32,14 +32,14 @@ fn angle_in_degrees (angle: f64) -> f64 {
 fn right_hand_side (theta: f64, phi: f64, p: f64, q: f64, omega2: f64) -> [f64; 5] {
     let cs = (theta - phi).cos();
     let sn = (theta - phi).sin();
-    let a = 3.0 / (16.0 - 9.0 * cs * cs);
-    let theta_dot = a * (8.0 * p - 3.0 * q * cs);
-    let phi_dot = a * (2.0 * q - 3.0 * p * cs);
+    let a = 1.0 / (1.0 + sn * sn);
+    let theta_dot = a * (p - q * cs);
+    let phi_dot = a * (2.0 * q - p * cs);
     let b = theta_dot * phi_dot * sn;
-    let p_dot = - b - 3.0 * omega2 * theta.sin();
+    let p_dot = - b - 2.0 * omega2 * theta.sin();
     let q_dot = b - omega2 * phi.sin();
     // Also evaluate total energy
-    let h = p * theta_dot + q * phi_dot - 2.0 * omega2 * (3.0 * theta.cos() + phi.cos());
+    let h = 0.5 * (p * theta_dot + q * phi_dot) - omega2 * (2.0 * theta.cos() + phi.cos());
     [theta_dot, phi_dot, p_dot, q_dot, h]
 }
 
@@ -57,9 +57,9 @@ fn find_pendulum (theta: f64, phi: f64, par: [f32; 4]) -> [f32; 4] {
     let x0 = par[2];
     let y0 = par[3];
 
-    let x1 = x0 - l * (theta.sin() as f32);
+    let x1 = x0 + l * (theta.sin() as f32);
     let y1 = y0 + l * (theta.cos() as f32);
-    let x2 = x1 - l * (phi.sin() as f32);
+    let x2 = x1 + l * (phi.sin() as f32);
     let y2 = y1 + l * (phi.cos() as f32);
 
     [x1, y1, x2, y2]
@@ -123,11 +123,11 @@ async fn main() {
     //let mut t_end = 0.0;
     
     let mut theta_0 = 175.0 *  PI / 180.0;
-    let mut phi_0 = 90.0 *  PI / 180.0;
+    let mut phi_0 = 120.0 *  PI / 180.0;
     let theta_dot_0 = 0.0;
     let phi_dot_0 = 0.0;
-    let mut p_0 = 8.0/3.0 * theta_dot_0 + phi_dot_0 * (theta_0 - phi_0).cos();
-    let mut q_0 = 2.0/3.0 * phi_dot_0 + theta_dot_0 * (theta_0 - phi_0).cos();
+    let mut p_0 = 2.0 * theta_dot_0 + phi_dot_0 * (theta_0 - phi_0).cos();
+    let mut q_0 = phi_dot_0 + theta_dot_0 * (theta_0 - phi_0).cos();
 
     //total energy
     let mut h = right_hand_side(theta_0, phi_0, p_0, q_0, omega2)[4];
@@ -145,16 +145,16 @@ async fn main() {
         let w = par[1];
 
         draw_text(format!("Use left/right or up/down arrows to move the pendulum!").as_str(), 5.0 * w, 5.0 * w, 3.0 * w, BLACK);
-        draw_text(format!("Press SPACE to start!").as_str(), 5.0 * w, 10.0 * w, 3.0 * w, BLACK);
+        draw_text(format!("Press SPACE to start!").as_str(), 5.0 * w, 9.0 * w, 3.0 * w, BLACK);
         
         ft = get_frame_time() as f64;
 
         if !is_key_down(KeyCode::Left) {
-            theta_0 = theta_0 + SPEED * ft;
+            theta_0 = theta_0 - SPEED * ft;
         }
 
         if !is_key_down(KeyCode::Right) {
-            theta_0 = theta_0 - SPEED * ft;
+            theta_0 = theta_0 + SPEED * ft;
         }
 
         if !is_key_down(KeyCode::Down) {
@@ -218,7 +218,7 @@ async fn main() {
             draw_trail(xy_mem.clone(), xy_last, w);
 
             draw_text(format!("Time elapsed, seconds: {:.3}", t_0).as_str(), 5.0 * w, 5.0 * w, 3.0 * w, BLACK);
-            draw_text(format!("Total energy, arb. units: {:.5}", h).as_str(), 5.0 * w, 10.0 * w, 3.0 * w, BLACK);
+            draw_text(format!("Total energy, arb. units: {:.5}", h).as_str(), 5.0 * w, 9.0 * w, 3.0 * w, BLACK);
 
             writeln!(my_file, "{} {} {} {}", t_0, angle_in_degrees(theta_0), angle_in_degrees(phi_0), h).expect("Error writing to file");
        
