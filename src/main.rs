@@ -1,8 +1,5 @@
 use macroquad::prelude::*;
 
-use std::fs;
-use std::io::{Write};
-use std::path::{PathBuf};
 use std::collections::LinkedList;
 
 const PI: f64 = 3.1415926536;
@@ -11,24 +8,6 @@ const SPEED: f64 = 1.0;
 const MEM: usize = 50;
 // friction time scale
 const FRICT: f64 = 1.0;
-
-// express angle in degrees
-fn angle_in_degrees (angle: f64) -> f64 {
-    let in_degrees;
-    if angle > 2.0 * PI {
-        let full_angles = (angle / (2.0 * PI)) as u32;
-        in_degrees = angle * 180.0 / PI - ((360 * full_angles) as f64)
-    } else {
-        if angle < - 2.0 * PI {
-            let full_angles = (- angle / (2.0 * PI)) as u32;
-            in_degrees = angle * 180.0 / PI + ((360 * full_angles) as f64)
-        } else {
-            in_degrees = angle * 180.0 / PI
-        }
-    }
-    if in_degrees < 0.0 {360.0 + in_degrees}
-    else {in_degrees}
-}
 
 // function for the right hand side of the equation
 fn right_hand_side (theta: f64, phi: f64, p: f64, q: f64, omega2: f64, c_frict: f64) -> [f64; 5] {
@@ -41,7 +20,7 @@ fn right_hand_side (theta: f64, phi: f64, p: f64, q: f64, omega2: f64, c_frict: 
     let p_dot = - b - 2.0 * omega2 * theta.sin() - c_frict * p;
     let q_dot = b - omega2 * phi.sin() - c_frict * q;
     // Also evaluate total energy
-    let h = 0.5 * (p * theta_dot + q * phi_dot) - omega2 * (2.0 * theta.cos() + phi.cos());
+    let h = 0.5 * (p * theta_dot + q * phi_dot) - omega2 * (2.0 * theta.cos() + phi.cos() - 3.0);
     [theta_dot, phi_dot, p_dot, q_dot, h]
 }
 
@@ -96,15 +75,6 @@ fn draw_trail (xy_mem: LinkedList<(f32, f32)>, xy_last: (f32, f32), w: f32) {
 #[macroquad::main("Double Pendulum")]
 async fn main() {
 
-    //make directory
-    let dir_name = "results";
-    fs::create_dir_all(dir_name).expect("Error creating directory");
-    
-    // file for data
-    let fl_name = "double_pendulum.dat";
-        let file_path: PathBuf = [dir_name, fl_name].iter().collect();
-        let mut my_file = fs::File::create(file_path).expect("Error creating file");
-
     loop {
 
     // pendulum parameters
@@ -117,7 +87,7 @@ async fn main() {
 
     // time parameters
     let tf = 500.0 * period;
-    let dt_millis: u64 = 4;
+    let dt_millis: u64 = 2;
     let dt = 0.001 * (dt_millis as f64);
     // frame time
     let mut ft: f64;
@@ -149,8 +119,8 @@ async fn main() {
         let w = par[1];
 
         draw_text(format!("Use left/right or up/down arrows to move the pendulum.").as_str(), 5.0 * w, 3.0 * w, 2.5 * w, BLACK);
-        draw_text(format!("Press F/J to increase/decrease friction.").as_str(), 5.0 * w, 6.0 * w, 2.5 * w, BLACK);
-        draw_text(format!("Press SPACE to start.").as_str(), 5.0 * w, 12.0 * w, 2.5 * w, BLACK);
+        draw_text(format!("Press [F]/[A] to increase/decrease friction.").as_str(), 5.0 * w, 6.0 * w, 2.5 * w, BLACK);
+        draw_text(format!("Press [SPACE] to start.").as_str(), 5.0 * w, 12.0 * w, 2.5 * w, BLACK);
         
         ft = get_frame_time() as f64;
 
@@ -159,7 +129,7 @@ async fn main() {
             else {c_frict = c_max};
         }
 
-        if is_key_down(KeyCode::J) {
+        if is_key_down(KeyCode::A) {
             if c_frict > 0.0 {c_frict = c_frict - SPEED * ft / 20.0}
             else {c_frict = 0.0};
         }
@@ -211,7 +181,7 @@ async fn main() {
 
     //start the calculation
 
-    while t_0 < tf && !is_key_down(KeyCode::Escape) {
+    while t_0 < tf && !is_key_down(KeyCode::R) {
 
         t_0 = t_0 + dt;
         
@@ -263,19 +233,17 @@ async fn main() {
                 else {c_frict = c_max};
             }
     
-            if is_key_down(KeyCode::J) {
+            if is_key_down(KeyCode::A) {
                 if c_frict > 0.0 {c_frict = c_frict - SPEED * ft / 10.0}
                 else {c_frict = 0.0};
             }
 
             draw_text(format!("Time elapsed, seconds: {:.3}", t_0).as_str(), 5.0 * w, 6.0 * w, 2.0 * w, BLACK);
             draw_text(format!("Total energy, arb. units: {:.5}", h).as_str(), 5.0 * w, 9.0 * w, 2.0 * w, BLACK);
-            draw_text(format!("Esc to reset the simulation!").as_str(), par[2] + 2.0 * w, 3.0 * w, 2.0 * w, BLACK);
-            draw_text(format!("Or try the arrow keys again ;)").as_str(), par[2] + 2.0 * w, 6.0 * w, 2.0 * w, BLACK);
+			draw_text(format!("Press [R] to reset the simulation!").as_str(), par[2] + 2.0 * w, 3.0 * w, 2.0 * w, BLACK);
+            draw_text(format!("Or use arrow keys to speed up the pendulum.").as_str(), par[2] + 2.0 * w, 6.0 * w, 2.0 * w, BLACK);
            // draw_text(format!("Press F/J to increase/decrease friction.").as_str(), 5.0 * w, 3.0 * w, 2.5 * w, BLACK);
             draw_text(format!("Friction coefficient: {:.3}. Max is {}.", c_frict, c_max).as_str(), 5.0 * w, 3.0 * w, 2.0 * w, BLACK);
-
-            writeln!(my_file, "{} {} {} {}", t_0, angle_in_degrees(theta_0), angle_in_degrees(phi_0), h).expect("Error writing to file");
        
             next_frame().await;
         }
