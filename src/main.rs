@@ -87,7 +87,7 @@ async fn main() {
 
     // time parameters
     let tf = 500.0 * period;
-    let dt_millis: u64 = 2;
+    let dt_millis: u64 = 3;
     let dt = 0.001 * (dt_millis as f64);
     // frame time
     let mut ft: f64;
@@ -182,7 +182,7 @@ async fn main() {
     //start the calculation
 
     while t_0 < tf && !is_key_down(KeyCode::R) {
-
+		
         t_0 = t_0 + dt;
         
         ft = get_frame_time() as f64;
@@ -247,6 +247,8 @@ async fn main() {
        
             next_frame().await;
         }
+
+        if h > 2000.0 {c_frict = c_max};
         
 
         rk_1 = right_hand_side(theta_0, phi_0, p_0, q_0, omega2, c_frict);
@@ -273,6 +275,11 @@ async fn main() {
         phi_0 = phi_0 + (rk_1[1] + 2.0 * rk_2[1] + 2.0 * rk_3[1] + rk_4[1]) * dt / 6.0;
         p_0 = p_0 + (rk_1[2] + 2.0 * rk_2[2] + 2.0 * rk_3[2] + rk_4[2]) * dt / 6.0;
         q_0 = q_0 + (rk_1[3] + 2.0 * rk_2[3] + 2.0 * rk_3[3] + rk_4[3]) * dt / 6.0;
+
+        if theta_0 > 2.0 * PI {theta_0 = theta_0 - 2.0 * PI}
+        if theta_0 < - 2.0 * PI {theta_0 = theta_0 + 2.0 * PI}
+        if phi_0 > 2.0 * PI {phi_0 = phi_0 - 2.0 * PI}
+        if phi_0 < - 2.0 * PI {phi_0 = phi_0 + 2.0 * PI}
 
         h = rk_1[4];    
     }
