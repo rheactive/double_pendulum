@@ -10,7 +10,7 @@ const SPEED: f64 = 1.0;
 // trail parameter
 const MEM: usize = 50;
 // friction time scale
-const FRICT: f64 = 2.0;
+const FRICT: f64 = 1.0;
 
 // express angle in degrees
 fn angle_in_degrees (angle: f64) -> f64 {
@@ -38,8 +38,8 @@ fn right_hand_side (theta: f64, phi: f64, p: f64, q: f64, omega2: f64, c_frict: 
     let theta_dot = a * (p - q * cs);
     let phi_dot = a * (2.0 * q - p * cs);
     let b = theta_dot * phi_dot * sn;
-    let p_dot = - b - 2.0 * omega2 * theta.sin() - c_frict * theta_dot;
-    let q_dot = b - omega2 * phi.sin() - c_frict * phi_dot;
+    let p_dot = - b - 2.0 * omega2 * theta.sin() - c_frict * p;
+    let q_dot = b - omega2 * phi.sin() - c_frict * q;
     // Also evaluate total energy
     let h = 0.5 * (p * theta_dot + q * phi_dot) - omega2 * (2.0 * theta.cos() + phi.cos());
     [theta_dot, phi_dot, p_dot, q_dot, h]
@@ -99,11 +99,13 @@ async fn main() {
     //make directory
     let dir_name = "results";
     fs::create_dir_all(dir_name).expect("Error creating directory");
-	
+    
     // file for data
     let fl_name = "double_pendulum.dat";
         let file_path: PathBuf = [dir_name, fl_name].iter().collect();
         let mut my_file = fs::File::create(file_path).expect("Error creating file");
+
+    loop {
 
     // pendulum parameters
     let period = 2.0;
@@ -114,18 +116,18 @@ async fn main() {
     let c_max = 1.0 / (FRICT * period);
 
     // time parameters
-    let tf = 100.0 * period;
+    let tf = 500.0 * period;
     let dt_millis: u64 = 4;
     let dt = 0.001 * (dt_millis as f64);
     // frame time
-	let mut ft: f64;
+    let mut ft: f64;
     
     // initial conditions
     let mut t_0 = 0.0;
     let mut t_draw = 0.0;
     
-    let mut theta_0 = 175.0 *  PI / 180.0;
-    let mut phi_0 = 120.0 *  PI / 180.0;
+    let mut theta_0 = 20.0 *  PI / 180.0;
+    let mut phi_0 = 20.0 *  PI / 180.0;
     let theta_dot_0 = 0.0;
     let phi_dot_0 = 0.0;
     let mut p_0 = 2.0 * theta_dot_0 + phi_dot_0 * (theta_0 - phi_0).cos();
@@ -164,20 +166,20 @@ async fn main() {
 
         draw_text(format!("Friction coefficient: {:.3}. Max is {}.", c_frict, c_max).as_str(), 5.0 * w, 9.0 * w, 2.5 * w, BLACK);
 
-        if !is_key_down(KeyCode::Left) {
+        if is_key_down(KeyCode::Left) {
             theta_0 = theta_0 - SPEED * ft;
         }
 
-        if !is_key_down(KeyCode::Right) {
+        if is_key_down(KeyCode::Right) {
             theta_0 = theta_0 + SPEED * ft;
         }
 
-        if !is_key_down(KeyCode::Down) {
-            phi_0 = phi_0 + SPEED * ft;
+        if is_key_down(KeyCode::Down) {
+            phi_0 = phi_0 - SPEED * ft;
         }
 
-        if !is_key_down(KeyCode::Up) {
-            phi_0 = phi_0 - SPEED * ft;
+        if is_key_down(KeyCode::Up) {
+            phi_0 = phi_0 + SPEED * ft;
         }
 
 
@@ -209,11 +211,11 @@ async fn main() {
 
     //start the calculation
 
-    while t_0 < tf {
+    while t_0 < tf && !is_key_down(KeyCode::Escape) {
 
         t_0 = t_0 + dt;
-		
-		ft = get_frame_time() as f64;
+        
+        ft = get_frame_time() as f64;
 
         if t_0 - t_draw > ft {
             t_draw = t_0;
@@ -232,18 +234,44 @@ async fn main() {
             draw_pendulum(coords, par);
             draw_trail(xy_mem.clone(), xy_last, w);
 
+            if is_key_down(KeyCode::Left) {
+                let delta = - 5.0 * SPEED * ft;
+                p_0 = p_0 + 2.0 * delta;
+                q_0 = q_0 + delta * (theta_0 - phi_0).cos();
+            }
+    
+            if is_key_down(KeyCode::Right) {
+                let delta = 5.0 * SPEED * ft;
+                p_0 = p_0 + 2.0 * delta;
+                q_0 = q_0 + delta * (theta_0 - phi_0).cos();
+            }
+    
+            if is_key_down(KeyCode::Down) {
+                let delta = - 5.0 * SPEED * ft;
+                q_0 = q_0 + delta;
+                p_0 = p_0 + delta * (theta_0 - phi_0).cos();
+            }
+    
+            if is_key_down(KeyCode::Up) {
+                let delta = 5.0 * SPEED * ft;
+                q_0 = q_0 + delta;
+                p_0 = p_0 + delta * (theta_0 - phi_0).cos();
+            }
+
             if is_key_down(KeyCode::F) {
-                if c_frict < c_max {c_frict = c_frict + SPEED * ft / 20.0}
+                if c_frict < c_max {c_frict = c_frict + SPEED * ft / 10.0}
                 else {c_frict = c_max};
             }
     
             if is_key_down(KeyCode::J) {
-                if c_frict > 0.0 {c_frict = c_frict - SPEED * ft / 20.0}
+                if c_frict > 0.0 {c_frict = c_frict - SPEED * ft / 10.0}
                 else {c_frict = 0.0};
             }
 
             draw_text(format!("Time elapsed, seconds: {:.3}", t_0).as_str(), 5.0 * w, 6.0 * w, 2.0 * w, BLACK);
             draw_text(format!("Total energy, arb. units: {:.5}", h).as_str(), 5.0 * w, 9.0 * w, 2.0 * w, BLACK);
+            draw_text(format!("Esc to reset the simulation!").as_str(), par[2] + 2.0 * w, 3.0 * w, 2.0 * w, BLACK);
+            draw_text(format!("Or try the arrow keys again ;)").as_str(), par[2] + 2.0 * w, 6.0 * w, 2.0 * w, BLACK);
            // draw_text(format!("Press F/J to increase/decrease friction.").as_str(), 5.0 * w, 3.0 * w, 2.5 * w, BLACK);
             draw_text(format!("Friction coefficient: {:.3}. Max is {}.", c_frict, c_max).as_str(), 5.0 * w, 3.0 * w, 2.0 * w, BLACK);
 
@@ -279,5 +307,7 @@ async fn main() {
         q_0 = q_0 + (rk_1[3] + 2.0 * rk_2[3] + 2.0 * rk_3[3] + rk_4[3]) * dt / 6.0;
 
         h = rk_1[4];    
+    }
+
     }
 }
