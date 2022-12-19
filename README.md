@@ -22,7 +22,7 @@ The simulation is made using 4th order Runge-Kutta scheme, and the animation is 
 
 ---
 
-# Update 2022-12-19
+## Update 2022-12-19
 
 Added dissipative force, which user can control. The force changes the momentum equations:
 
