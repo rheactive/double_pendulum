@@ -99,7 +99,6 @@ async fn main() {
     fs::create_dir_all(dir_name).expect("Error creating directory");
 	
     // file for data
-    //file for nanostructures data
     let fl_name = "double_pendulum.dat";
         let file_path: PathBuf = [dir_name, fl_name].iter().collect();
         let mut my_file = fs::File::create(file_path).expect("Error creating file");
@@ -119,8 +118,6 @@ async fn main() {
     // initial conditions
     let mut t_0 = 0.0;
     let mut t_draw = 0.0;
-    //let mut t_start = 0.0;
-    //let mut t_end = 0.0;
     
     let mut theta_0 = 175.0 *  PI / 180.0;
     let mut phi_0 = 120.0 *  PI / 180.0;
