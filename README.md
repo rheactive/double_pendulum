@@ -26,8 +26,8 @@ The simulation is made using 4th order Runge-Kutta scheme, and the animation is 
 
 Added dissipative force, which user can control. The force changes the momentum equations:
 
-$$\dot{p} = - \dot{\theta} \dot{\phi} \sin \delta - 2 \omega^2 \sin \theta - c \dot{\theta}$$
+$$\dot{p} = - \dot{\theta} \dot{\phi} \sin \delta - 2 \omega^2 \sin \theta - c p$$
 
-$$\dot{q} = \dot{\theta} \dot{\phi} \sin \delta - \omega^2 \sin \phi - c \dot{\phi}$$
+$$\dot{q} = \dot{\theta} \dot{\phi} \sin \delta - \omega^2 \sin \phi - c q$$
 
 This should be the right way to account for air friction, and the simulation looks good.
