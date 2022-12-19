@@ -31,3 +31,7 @@ $$\dot{p} = - \dot{\theta} \dot{\phi} \sin \delta - 2 \omega^2 \sin \theta - c p
 $$\dot{q} = \dot{\theta} \dot{\phi} \sin \delta - \omega^2 \sin \phi - c q$$
 
 This should be the right way to account for air friction, and the simulation looks good.
+
+---
+
+Also added a lot of interactivity. You can now reset the simulation without rebooting the program. You can also give the pendulum a "boost" with arrow keys during simulation. Try it with friction on!
