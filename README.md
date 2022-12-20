@@ -8,7 +8,7 @@ Each new simulation cycle overwrites the previous file, so be careful.
 
 The masses and the lengths are the same. The only free parameter in the simulation is the frequency:
 
-$$ \omega^2 = \sqrt{\frac{g}{l}} = \frac{2 \pi}{T} $$
+$$ \omega = \sqrt{\frac{g}{l}} = \frac{2 \pi}{T} $$
 
 Let's call the angles $\theta, \phi$, their difference $\delta = \theta - \phi$ and the canonical momenta $p, q$. Then the Lagrangian equations are:
 
