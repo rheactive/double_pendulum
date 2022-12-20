@@ -1,5 +1,7 @@
 # Double pendulum simulation
 
+![Program window during simulation](./pictures/Running_view.png)
+
 The masses and the lengths are the same. The only free parameter in the simulation is the frequency:
 
 $$ \omega^2 = \sqrt{\frac{g}{l}} = \frac{2 \pi}{T} $$
