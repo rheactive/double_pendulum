@@ -1,5 +1,9 @@
 # Double pendulum simulation
 
+This is a version of the program which outputs all movement data (angles, momenta, energy, friction) into a file. I also included a script for plotting, which uses R ggplot2. The angles are shifted by $\pi$ so the plots look better.
+
+Each new simulation cycle overwrites the previous file, so be careful.
+
 ![Program window during simulation](./pictures/Running_view.png)
 
 The masses and the lengths are the same. The only free parameter in the simulation is the frequency:
