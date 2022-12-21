@@ -1,7 +1,10 @@
 use macroquad::prelude::*;
 
 use std::collections::LinkedList;
+use std::time::Duration;
+use std::thread::sleep;
 
+const FT_DESIRED: f64 = 0.01666666666667;
 const PI: f64 = 3.1415926536;
 const SPEED: f64 = 1.0;
 // trail parameter
@@ -91,6 +94,8 @@ async fn main() {
     let dt = 0.001 * (dt_millis as f64);
     // frame time
     let mut ft: f64;
+    let mut time_start: f64 = 0.0;
+    let mut time_end: f64;
     
     // initial conditions
     let mut t_0 = 0.0;
@@ -184,10 +189,19 @@ async fn main() {
     while t_0 < tf && !is_key_down(KeyCode::R) {
 		
         t_0 = t_0 + dt;
-        
+
         ft = get_frame_time() as f64;
 
         if t_0 - t_draw > ft {
+
+            time_end = get_time();
+
+            if time_end - time_start < FT_DESIRED {
+                sleep(Duration::from_secs_f64(FT_DESIRED - time_end + time_start));
+            }
+        
+            time_start = get_time();
+
             t_draw = t_0;
 
             clear_background(LIGHTGRAY);
@@ -240,9 +254,10 @@ async fn main() {
 
             draw_text(format!("Time elapsed, seconds: {:.3}", t_0).as_str(), 5.0 * w, 6.0 * w, 2.0 * w, BLACK);
             draw_text(format!("Total energy, arb. units: {:.5}", h).as_str(), 5.0 * w, 9.0 * w, 2.0 * w, BLACK);
-			draw_text(format!("Press [R] to reset the simulation!").as_str(), par[2] + 2.0 * w, 3.0 * w, 2.0 * w, BLACK);
-            draw_text(format!("Or use arrow keys to speed up the pendulum.").as_str(), par[2] + 2.0 * w, 6.0 * w, 2.0 * w, BLACK);
-           // draw_text(format!("Press F/J to increase/decrease friction.").as_str(), 5.0 * w, 3.0 * w, 2.5 * w, BLACK);
+			draw_text(format!("Press [R] to reset the simulation!").as_str(), par[2] + 10.0 * w, 3.0 * w, 2.0 * w, BLACK);
+            draw_text(format!("Or use arrow keys to speed up the pendulum.").as_str(), par[2] + 10.0 * w, 6.0 * w, 2.0 * w, BLACK);
+            draw_text(format!("FPS is {}", get_fps()).as_str(), 5.0 * w, 2.0 * par[3] - 3.0 * w, 2.0 * w, BLACK);
+            //draw_text(format!("Press F/J to increase/decrease friction.").as_str(), 5.0 * w, 3.0 * w, 2.5 * w, BLACK);
             draw_text(format!("Friction coefficient: {:.3}. Max is {}.", c_frict, c_max).as_str(), 5.0 * w, 3.0 * w, 2.0 * w, BLACK);
        
             next_frame().await;
@@ -281,7 +296,7 @@ async fn main() {
         if phi_0 > 2.0 * PI {phi_0 = phi_0 - 2.0 * PI}
         if phi_0 < - 2.0 * PI {phi_0 = phi_0 + 2.0 * PI}
 
-        h = rk_1[4];    
+        h = rk_1[4]; 
     }
 
     }
