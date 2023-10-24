@@ -63,11 +63,13 @@ fn draw_pendulum(coords: [f32; 4], par: [f32; 4]) {
     draw_line(x0, y0, x1, y1, w / 2.0, BLACK);
     draw_line(x1, y1, x2, y2, w / 2.0, BLACK);
     draw_circle(x0, y0, w, BLACK);
-    draw_circle(x1, y1, w, BLUE);
-    draw_circle(x2, y2, w, MAROON);
+    draw_circle(x1, y1, w, BLACK);
+    draw_circle(x1, y1, 0.8*w, DARKPURPLE);
+    draw_circle(x2, y2, w, BLACK);
+    draw_circle(x2, y2, 0.8*w, LIGHTGRAY);
 }
 
-fn draw_trail(xy_mem: LinkedList<(f32, f32)>, xy_last: (f32, f32), w: f32) {
+fn draw_trail(xy_mem: &LinkedList<(f32, f32)>, xy_last: (f32, f32), w: f32) {
     let mut iter1 = xy_mem.iter();
     let mut iter2 = xy_mem.iter();
     iter2.next();
@@ -76,9 +78,9 @@ fn draw_trail(xy_mem: LinkedList<(f32, f32)>, xy_last: (f32, f32), w: f32) {
         let xy1 = iter1.next().unwrap();
         let xy2 = iter2.next().unwrap();
         //draw_circle(xy1.0, xy1.1, w / 5.0, MAROON);
-        draw_line(xy1.0, xy1.1,xy2.0, xy2.1, w / 5.0, MAROON);
+        draw_line(xy1.0, xy1.1,xy2.0, xy2.1, w / 5.0, DARKPURPLE);
     }
-    draw_circle(xy_last.0, xy_last.1, w / 3.0, MAROON);
+    draw_circle(xy_last.0, xy_last.1, w / 3.0, DARKPURPLE);
 }
 
 fn solve_equations(
@@ -181,7 +183,7 @@ async fn main() {
         // draw the pendulum initial state
 
         while !is_key_down(KeyCode::Space) {
-            clear_background(LIGHTGRAY);
+            clear_background(SKYBLUE);
 
             let par = get_window_par(screen_height(), screen_width());
             let coords = find_pendulum(theta_0, phi_0, par);
@@ -288,7 +290,7 @@ async fn main() {
 
                 t_draw = t_0;
 
-                clear_background(LIGHTGRAY);
+                clear_background(SKYBLUE);
 
                 par = get_window_par(screen_height(), screen_width());
                 w = par[1];
@@ -299,8 +301,8 @@ async fn main() {
 
                 xy_mem.push_front((coords[2], coords[3]));
 
+                draw_trail(&xy_mem, xy_last, w);
                 draw_pendulum(coords, par);
-                draw_trail(xy_mem.clone(), xy_last, w);
 
                 if is_key_down(KeyCode::Left) {
                     let delta = -5.0 * SPEED * ft;
