@@ -68,9 +68,15 @@ fn draw_pendulum(coords: [f32; 4], par: [f32; 4]) {
 }
 
 fn draw_trail(xy_mem: LinkedList<(f32, f32)>, xy_last: (f32, f32), w: f32) {
+    let mut iter1 = xy_mem.iter();
+    let mut iter2 = xy_mem.iter();
+    iter2.next();
     // calculate and plot pendulum positions
-    for xy in xy_mem {
-        draw_circle(xy.0, xy.1, w / 5.0, MAROON);
+    for _jm in 0..(MEM-1) {
+        let xy1 = iter1.next().unwrap();
+        let xy2 = iter2.next().unwrap();
+        //draw_circle(xy1.0, xy1.1, w / 5.0, MAROON);
+        draw_line(xy1.0, xy1.1,xy2.0, xy2.1, w / 5.0, MAROON);
     }
     draw_circle(xy_last.0, xy_last.1, w / 3.0, MAROON);
 }
