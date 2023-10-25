@@ -62,7 +62,7 @@ fn draw_pendulum(coords: [f32; 4], par: [f32; 4]) {
 
     draw_line(x0, y0, x1, y1, w / 2.0, BLACK);
     draw_line(x1, y1, x2, y2, w / 2.0, BLACK);
-    draw_circle(x0, y0, w, BLACK);
+    draw_circle(x0, y0, 0.5 * w, BLACK);
     draw_circle(x1, y1, w, BLACK);
     draw_circle(x1, y1, 0.8*w, DARKPURPLE);
     draw_circle(x2, y2, w, BLACK);
