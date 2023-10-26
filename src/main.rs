@@ -1,5 +1,9 @@
 use macroquad::prelude::*;
 
+use std::fs;
+use std::io::{Write};
+use std::path::{PathBuf};
+
 use std::collections::LinkedList;
 use std::thread::sleep;
 use std::time::Duration;
@@ -148,6 +152,19 @@ fn solve_equations(
 
 #[macroquad::main("Double Pendulum")]
 async fn main() {
+
+        //make directory
+        let dir_name = "dp_results";
+        fs::create_dir_all(dir_name).expect("Error creating directory");
+        
+        // file for data
+        let fl_name = "double_pendulum.dat";
+            let file_path: PathBuf = [dir_name, fl_name].iter().collect();
+            let mut my_file = fs::File::create(file_path).expect("Error creating file");
+    
+        // column names
+        writeln!(my_file, "t theta phi p q c H").expect("Error writing to file");
+
     loop {
         // pendulum parameters
         let period = 2.0;
@@ -394,6 +411,8 @@ async fn main() {
                     BLACK,
                 );
 
+            writeln!(my_file, "{} {} {} {} {} {} {}", t_0, angle_in_degrees(theta_0), angle_in_degrees(phi_0), p_0, q_0, c_frict, h).expect("Error writing to file");
+
                 next_frame().await;
             }
 
@@ -409,4 +428,12 @@ async fn main() {
             h = solution[4]
         }
     }
+}
+
+
+// express angle in degrees
+fn angle_in_degrees (angle: f64) -> f64 {
+    let in_degrees = angle * 180.0 / PI;
+    if in_degrees < 0.0 {360.0 + in_degrees}
+    else {in_degrees}
 }
