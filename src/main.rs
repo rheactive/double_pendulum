@@ -154,12 +154,12 @@ fn solve_equations(
 async fn main() {
 
         //make directory
-        let dir_name = "dp_results";
-        fs::create_dir_all(dir_name).expect("Error creating directory");
+        //let dir_name = "dp_results";
+        //fs::create_dir_all(dir_name).expect("Error creating directory");
         
         // file for data
         let fl_name = "double_pendulum.dat";
-            let file_path: PathBuf = [dir_name, fl_name].iter().collect();
+            let file_path: PathBuf = [fl_name].iter().collect();
             let mut my_file = fs::File::create(file_path).expect("Error creating file");
     
         // column names
@@ -175,7 +175,7 @@ async fn main() {
         let c_max = 1.0 / (FRICT * period);
 
         // time parameters
-        let tf = 500.0 * period;
+        let tf = 1000.0 * period;
         let dt_millis: u64 = 3;
         let dt = 0.001 * (dt_millis as f64);
         // frame time
@@ -187,8 +187,8 @@ async fn main() {
         let mut t_0 = 0.0;
         let mut t_draw = 0.0;
 
-        let mut theta_0 = 20.0 * PI / 180.0;
-        let mut phi_0 = 20.0 * PI / 180.0;
+        let mut theta_0 = 0.5 * PI;
+        let mut phi_0 = PI;
         let theta_dot_0 = 0.0;
         let phi_dot_0 = 0.0;
         let mut p_0 = 2.0 * theta_dot_0 + phi_dot_0 * (theta_0 - phi_0).cos();
@@ -216,17 +216,43 @@ async fn main() {
                 2.5 * w,
                 BLACK,
             );
+
             draw_text(
-                format!("Press [F]/[A] to increase/decrease friction.").as_str(),
+                format!("Angle 1: {:.1} degrees.", angle_in_degrees(theta_0)).as_str(),
                 5.0 * w,
                 6.0 * w,
                 2.5 * w,
                 BLACK,
             );
+
+            draw_text(
+                format!("Angle 2: {:.1} degrees.", angle_in_degrees(phi_0)).as_str(),
+                5.0 * w,
+                9.0 * w,
+                2.5 * w,
+                BLACK,
+            );
+
+            draw_text(
+                format!("Press [F]/[A] to increase/decrease friction.").as_str(),
+                5.0 * w,
+                2.0 * par[3] - 9.0 * w,
+                2.5 * w,
+                BLACK,
+            );
+
+            draw_text(
+                format!("Friction coefficient: {:.3}. Max is {}.", c_frict, c_max).as_str(),
+                5.0 * w,
+                2.0 * par[3] - 6.0 * w,
+                2.5 * w,
+                BLACK,
+            );
+
             draw_text(
                 format!("Press [SPACE] to start.").as_str(),
                 5.0 * w,
-                12.0 * w,
+                2.0 * par[3] - 3.0 * w,
                 2.5 * w,
                 BLACK,
             );
@@ -248,14 +274,6 @@ async fn main() {
                     c_frict = 0.0
                 };
             }
-
-            draw_text(
-                format!("Friction coefficient: {:.3}. Max is {}.", c_frict, c_max).as_str(),
-                5.0 * w,
-                9.0 * w,
-                2.5 * w,
-                BLACK,
-            );
 
             if is_key_down(KeyCode::Left) {
                 theta_0 = theta_0 - SPEED * ft;
@@ -434,6 +452,11 @@ async fn main() {
 // express angle in degrees
 fn angle_in_degrees (angle: f64) -> f64 {
     let in_degrees = angle * 180.0 / PI;
-    if in_degrees < 0.0 {360.0 + in_degrees}
+    if in_degrees < 0.0 {
+        360.0 + in_degrees
+    }
+    else if in_degrees > 360.0 {
+        - 360.0 + in_degrees
+    }
     else {in_degrees}
 }
