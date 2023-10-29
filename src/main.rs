@@ -1,12 +1,14 @@
 use macroquad::prelude::*;
 
 use std::fs;
-use std::io::{Write};
-use std::path::{PathBuf};
+use std::io::Write;
+use std::path::PathBuf;
 
 use std::collections::LinkedList;
 use std::thread::sleep;
 use std::time::Duration;
+
+use std::vec::Vec;
 
 const FT_DESIRED: f64 = 0.01666666666667;
 const PI: f64 = std::f64::consts::PI;
@@ -15,6 +17,165 @@ const SPEED: f64 = 1.0;
 const MEM: usize = 50;
 // friction time scale
 const FRICT: f64 = 1.0;
+// g
+const G: f64 = 9.81;
+
+struct MyVec {
+    vec: Vec<f64>,
+    n: usize,
+}
+
+impl MyVec {
+    fn new_emp(n: usize) -> MyVec {
+        MyVec {
+            vec: vec![0.0; n],
+            n,
+        }
+    }
+
+    fn new_from(a: &Vec<f64>) -> MyVec {
+        MyVec {
+            vec: a.to_vec(),
+            n: a.len(),
+        }
+    }
+
+    fn add(&self, a: &MyVec) -> MyVec {
+        if self.n != a.n {
+            panic!("Vector addition panic: lengths not equal")
+        }
+        let mut c: Vec<f64> = Vec::new();
+        for j in 0..self.n {
+            c[j] = self.vec[j] + a.vec[j]
+        }
+        MyVec::new_from(&c)
+    }
+
+    fn scale(&self, s: f64) -> MyVec {
+        let mut c: Vec<f64> = Vec::new();
+        for j in 0..self.n {
+            c[j] = self.vec[j] * s
+        }
+        MyVec::new_from(&c)
+    }
+}
+
+fn runge_kutta(
+    vars: &MyVec,
+    pars: &Vec<f64>,
+    rhs: &fn(&MyVec, &Vec<f64>) -> MyVec,
+    dt: f64,
+) -> MyVec {
+    let rk_1 = rhs(vars, pars);
+    let rk_2 = rhs(&vars.add(&rk_1.scale(dt / 2.0)), pars);
+    let rk_3 = rhs(&vars.add(&rk_2.scale(dt / 2.0)), pars);
+    let rk_4 = rhs(&vars.add(&rk_3.scale(dt)), pars);
+
+    let vars_new = vars
+        .add(&rk_1.scale(dt / 6.0))
+        .add(&rk_2.scale(dt / 3.0))
+        .add(&rk_3.scale(dt / 3.0))
+        .add(&rk_4.scale(dt / 6.0));
+    vars_new
+}
+
+// pendulum struct
+
+struct Pendulum {
+    id: usize,
+    period: f64,
+    omega2: f64,
+    angle_deg: f64,
+    angle: f64,
+    momentum: f64,
+    angle_dot: f64,
+    momentum_dot: f64,
+    length: f64,
+    base_vec: [f64; 2],
+    ball_vec: [f64; 2],
+    friction: f64,
+}
+
+impl Pendulum {
+    fn new(id: usize, base_vec: [f64; 2], angle_deg: f64, period: Option<f64>, friction: Option<f64>) -> Pendulum {
+        let period = period.unwrap_or(2.0);
+        let omega = 2.0 * PI / period;
+        let omega2 = omega.powi(2);
+        let angle = angle_deg / 180.0 * PI;
+        let length = G / omega2;
+        Pendulum {
+            id,
+            period,
+            omega2,
+            angle_deg,
+            angle,
+            momentum: 0.0,
+            angle_dot: 0.0,
+            momentum_dot: 0.0,
+            length,
+            base_vec,
+            ball_vec: [
+                base_vec[0] + length * angle.sin(),
+                base_vec[1] - length * angle.cos(),
+            ],
+            friction: friction.unwrap_or(0.0),
+        }
+    }
+}
+
+// get a vector of variables from the two pendula
+
+fn get_pen_vars(pendulum1: &Pendulum, pendulum2: &Pendulum) -> MyVec {
+    let v = vec![pendulum1.angle, pendulum2.angle, pendulum1.momentum, pendulum2.momentum];
+    MyVec::new_from(&v)
+}
+
+fn get_pen_pars(pendulum1: &Pendulum, pendulum2: &Pendulum) -> Vec<f64> {
+    let v = vec![pendulum1.omega2, pendulum2.omega2, pendulum1.friction, pendulum2.friction];
+    v
+}
+
+fn rhs(vars: &MyVec, pars: &Vec<f64>) -> MyVec {
+    let theta = vars.vec[0];
+    let phi = vars.vec[1];
+    let p = vars.vec[2];
+    let q = vars.vec[3];
+    let omega21 = pars[0];
+    let omega22 = pars[1];
+    let c_frict1 = pars[2];
+    let c_frict2 = pars[3];
+
+    let cs = (theta - phi).cos();
+    let sn = (theta - phi).sin();
+    let a = 1.0 / (1.0 + sn * sn);
+    let theta_dot = a * (p - q * cs);
+    let phi_dot = a * (2.0 * q - p * cs);
+    let b = theta_dot * phi_dot * sn;
+    let p_dot = -b - 2.0 * omega21 * theta.sin() - c_frict1 * p;
+    let q_dot = b - omega22 * phi.sin() - c_frict2 * q;
+
+    let v = vec![theta_dot, phi_dot, p_dot, q_dot];
+    MyVec::new_from(&v)
+
+}
+
+fn total_energy (vars: &MyVec, pars: &Vec<f64>) -> f64 {
+    let theta = vars.vec[0];
+    let phi = vars.vec[1];
+    let p = vars.vec[2];
+    let q = vars.vec[3];
+    let omega21 = pars[0];
+    let omega22 = pars[1];
+
+    let cs = (theta - phi).cos();
+    let sn = (theta - phi).sin();
+    let a = 1.0 / (1.0 + sn * sn);
+    let theta_dot = a * (p - q * cs);
+    let phi_dot = a * (2.0 * q - p * cs);
+
+    let h = 0.5 * (p * theta_dot + q * phi_dot) - (2.0 * omega21 * theta.cos() + omega22 * phi.cos());
+    h
+}
 
 // function for the right hand side of the equation
 fn right_hand_side(theta: f64, phi: f64, p: f64, q: f64, omega2: f64, c_frict: f64) -> [f64; 5] {
@@ -68,9 +229,9 @@ fn draw_pendulum(coords: [f32; 4], par: [f32; 4]) {
     draw_line(x1, y1, x2, y2, w / 2.0, BLACK);
     draw_circle(x0, y0, 0.5 * w, BLACK);
     draw_circle(x1, y1, w, BLACK);
-    draw_circle(x1, y1, 0.8*w, DARKPURPLE);
+    draw_circle(x1, y1, 0.8 * w, DARKPURPLE);
     draw_circle(x2, y2, w, BLACK);
-    draw_circle(x2, y2, 0.8*w, LIGHTGRAY);
+    draw_circle(x2, y2, 0.8 * w, LIGHTGRAY);
 }
 
 fn draw_trail(xy_mem: &LinkedList<(f32, f32)>, xy_last: (f32, f32), w: f32) {
@@ -78,11 +239,11 @@ fn draw_trail(xy_mem: &LinkedList<(f32, f32)>, xy_last: (f32, f32), w: f32) {
     let mut iter2 = xy_mem.iter();
     iter2.next();
     // calculate and plot pendulum positions
-    for _jm in 0..(MEM-1) {
+    for _jm in 0..(MEM - 1) {
         let xy1 = iter1.next().unwrap();
         let xy2 = iter2.next().unwrap();
         //draw_circle(xy1.0, xy1.1, w / 5.0, MAROON);
-        draw_line(xy1.0, xy1.1,xy2.0, xy2.1, w / 5.0, DARKPURPLE);
+        draw_line(xy1.0, xy1.1, xy2.0, xy2.1, w / 5.0, DARKPURPLE);
     }
     draw_circle(xy_last.0, xy_last.1, w / 3.0, DARKPURPLE);
 }
@@ -152,18 +313,17 @@ fn solve_equations(
 
 #[macroquad::main("Double Pendulum")]
 async fn main() {
+    //make directory
+    //let dir_name = "dp_results";
+    //fs::create_dir_all(dir_name).expect("Error creating directory");
 
-        //make directory
-        //let dir_name = "dp_results";
-        //fs::create_dir_all(dir_name).expect("Error creating directory");
-        
-        // file for data
-        let fl_name = "double_pendulum.dat";
-            let file_path: PathBuf = [fl_name].iter().collect();
-            let mut my_file = fs::File::create(file_path).expect("Error creating file");
-    
-        // column names
-        writeln!(my_file, "t theta phi p q c H").expect("Error writing to file");
+    // file for data
+    let fl_name = "double_pendulum.dat";
+    let file_path: PathBuf = [fl_name].iter().collect();
+    let mut my_file = fs::File::create(file_path).expect("Error creating file");
+
+    // column names
+    writeln!(my_file, "t theta phi p q c H").expect("Error writing to file");
 
     loop {
         // pendulum parameters
@@ -429,7 +589,18 @@ async fn main() {
                     BLACK,
                 );
 
-            writeln!(my_file, "{} {} {} {} {} {} {}", t_0, angle_in_degrees(theta_0), angle_in_degrees(phi_0), p_0, q_0, c_frict, h).expect("Error writing to file");
+                writeln!(
+                    my_file,
+                    "{} {} {} {} {} {} {}",
+                    t_0,
+                    angle_in_degrees(theta_0),
+                    angle_in_degrees(phi_0),
+                    p_0,
+                    q_0,
+                    c_frict,
+                    h
+                )
+                .expect("Error writing to file");
 
                 next_frame().await;
             }
@@ -448,15 +619,14 @@ async fn main() {
     }
 }
 
-
 // express angle in degrees
-fn angle_in_degrees (angle: f64) -> f64 {
+fn angle_in_degrees(angle: f64) -> f64 {
     let in_degrees = angle * 180.0 / PI;
     if in_degrees < 0.0 {
         360.0 + in_degrees
+    } else if in_degrees > 360.0 {
+        -360.0 + in_degrees
+    } else {
+        in_degrees
     }
-    else if in_degrees > 360.0 {
-        - 360.0 + in_degrees
-    }
-    else {in_degrees}
 }
