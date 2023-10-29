@@ -15,8 +15,6 @@ const PI: f64 = std::f64::consts::PI;
 const SPEED: f64 = 1.0;
 // trail parameter
 const MEM: usize = 50;
-// friction time scale
-const FRICT: f64 = 1.0;
 // g
 const G: f64 = 9.81;
 
@@ -26,7 +24,7 @@ struct MyVec {
 }
 
 impl MyVec {
-    fn new_emp(n: usize) -> MyVec {
+    fn _new_emp(n: usize) -> MyVec {
         MyVec {
             vec: vec![0.0; n],
             n,
@@ -44,7 +42,7 @@ impl MyVec {
         if self.n != a.n {
             panic!("Vector addition panic: lengths not equal")
         }
-        let mut c: Vec<f64> = Vec::new();
+        let mut c = vec![0.0; self.n];
         for j in 0..self.n {
             c[j] = self.vec[j] + a.vec[j]
         }
@@ -52,7 +50,7 @@ impl MyVec {
     }
 
     fn scale(&self, s: f64) -> MyVec {
-        let mut c: Vec<f64> = Vec::new();
+        let mut c = vec![0.0; self.n];
         for j in 0..self.n {
             c[j] = self.vec[j] * s
         }
@@ -63,7 +61,7 @@ impl MyVec {
 fn runge_kutta(
     vars: &MyVec,
     pars: &Vec<f64>,
-    rhs: &fn(&MyVec, &Vec<f64>) -> MyVec,
+    rhs: &dyn Fn(&MyVec, &Vec<f64>) -> MyVec,
     dt: f64,
 ) -> MyVec {
     let rk_1 = rhs(vars, pars);
@@ -81,8 +79,8 @@ fn runge_kutta(
 
 // pendulum struct
 
+#[derive(Clone)]
 struct Pendulum {
-    id: usize,
     period: f64,
     omega2: f64,
     angle_deg: f64,
@@ -97,14 +95,13 @@ struct Pendulum {
 }
 
 impl Pendulum {
-    fn new(id: usize, base_vec: [f64; 2], angle_deg: f64, period: Option<f64>, friction: Option<f64>) -> Pendulum {
+    fn new(base_vec: [f64; 2], angle_deg: f64, period: Option<f64>, friction: Option<f64>) -> Pendulum {
         let period = period.unwrap_or(2.0);
         let omega = 2.0 * PI / period;
         let omega2 = omega.powi(2);
         let angle = angle_deg / 180.0 * PI;
         let length = G / omega2;
         Pendulum {
-            id,
             period,
             omega2,
             angle_deg,
@@ -125,17 +122,65 @@ impl Pendulum {
 
 // get a vector of variables from the two pendula
 
-fn get_pen_vars(pendulum1: &Pendulum, pendulum2: &Pendulum) -> MyVec {
-    let v = vec![pendulum1.angle, pendulum2.angle, pendulum1.momentum, pendulum2.momentum];
-    MyVec::new_from(&v)
+struct DynModel {
+    pendula: Vec<Pendulum>,
+    vars: MyVec,
+    pars: Vec<f64>,
 }
 
-fn get_pen_pars(pendulum1: &Pendulum, pendulum2: &Pendulum) -> Vec<f64> {
-    let v = vec![pendulum1.omega2, pendulum2.omega2, pendulum1.friction, pendulum2.friction];
-    v
+impl DynModel {
+    fn new_dp (top_angle_deg: f64, bottom_angle_deg: f64) -> DynModel {
+        let mut pendula = Vec::new();
+        pendula.push(Pendulum::new([0.0; 2], top_angle_deg, None, None));
+        pendula.push(Pendulum::new(pendula[0].ball_vec, bottom_angle_deg, None, None));
+        let vars = DynModel::get_pen_vars(&pendula);
+        let pars = DynModel::get_pen_pars(&pendula);
+
+        DynModel {
+            pendula,
+            vars,
+            pars,
+        }
+    }
+
+    fn set_momenta_dp(&mut self) {
+        let cs = (self.pendula[0].angle - self.pendula[1].angle).cos();
+        self.pendula[0].momentum = 2.0 * self.pendula[0].angle_dot + self.pendula[1].angle_dot * cs;
+        self.pendula[1].momentum = self.pendula[1].angle_dot + self.pendula[0].angle_dot * cs;
+        self.vars = DynModel::get_pen_vars(&self.pendula);
+        self.pars = DynModel::get_pen_pars(&self.pendula);
+    }
+
+    fn update_dp(&mut self, dt: f64) {
+        self.vars = runge_kutta(&self.vars, &self.pars, &rhs_dp, dt);
+    }
+
+    fn get_pen_vars(pendula: &Vec<Pendulum>) -> MyVec {
+        let mut vars = Vec::new();
+        for pend in pendula {
+            vars.push(pend.angle)
+        }
+        for pend in pendula {
+            vars.push(pend.momentum)
+        }
+        MyVec::new_from(&vars)
+    }
+    
+    fn get_pen_pars(pendula: &Vec<Pendulum>) -> Vec<f64> {
+        let mut pars = Vec::new();
+        for pend in pendula {
+            pars.push(pend.omega2)
+        }
+        for pend in pendula {
+            pars.push(pend.friction)
+        }
+        pars
+    }
 }
 
-fn rhs(vars: &MyVec, pars: &Vec<f64>) -> MyVec {
+
+
+fn rhs_dp(vars: &MyVec, pars: &Vec<f64>) -> MyVec {
     let theta = vars.vec[0];
     let phi = vars.vec[1];
     let p = vars.vec[2];
@@ -159,7 +204,7 @@ fn rhs(vars: &MyVec, pars: &Vec<f64>) -> MyVec {
 
 }
 
-fn total_energy (vars: &MyVec, pars: &Vec<f64>) -> f64 {
+fn total_energy_dp(vars: &MyVec, pars: &Vec<f64>) -> f64 {
     let theta = vars.vec[0];
     let phi = vars.vec[1];
     let p = vars.vec[2];
@@ -175,21 +220,6 @@ fn total_energy (vars: &MyVec, pars: &Vec<f64>) -> f64 {
 
     let h = 0.5 * (p * theta_dot + q * phi_dot) - (2.0 * omega21 * theta.cos() + omega22 * phi.cos());
     h
-}
-
-// function for the right hand side of the equation
-fn right_hand_side(theta: f64, phi: f64, p: f64, q: f64, omega2: f64, c_frict: f64) -> [f64; 5] {
-    let cs = (theta - phi).cos();
-    let sn = (theta - phi).sin();
-    let a = 1.0 / (1.0 + sn * sn);
-    let theta_dot = a * (p - q * cs);
-    let phi_dot = a * (2.0 * q - p * cs);
-    let b = theta_dot * phi_dot * sn;
-    let p_dot = -b - 2.0 * omega2 * theta.sin() - c_frict * p;
-    let q_dot = b - omega2 * phi.sin() - c_frict * q;
-    // Also evaluate total energy
-    let h = 0.5 * (p * theta_dot + q * phi_dot) - omega2 * (2.0 * theta.cos() + phi.cos() - 3.0);
-    [theta_dot, phi_dot, p_dot, q_dot, h]
 }
 
 fn get_window_par(height: f32, width: f32) -> [f32; 4] {
@@ -248,69 +278,6 @@ fn draw_trail(xy_mem: &LinkedList<(f32, f32)>, xy_last: (f32, f32), w: f32) {
     draw_circle(xy_last.0, xy_last.1, w / 3.0, DARKPURPLE);
 }
 
-fn solve_equations(
-    theta_0: f64,
-    phi_0: f64,
-    p_0: f64,
-    q_0: f64,
-    dt: f64,
-    omega2: f64,
-    c_frict: f64,
-) -> [f64; 5] {
-    // introduce the state variables
-    let mut theta: f64;
-    let mut phi: f64;
-    let mut p: f64;
-    let mut q: f64;
-
-    // Runge-Kutta coefficients
-    let rk_1: [f64; 5];
-    let rk_2: [f64; 5];
-    let rk_3: [f64; 5];
-    let rk_4: [f64; 5];
-
-    rk_1 = right_hand_side(theta_0, phi_0, p_0, q_0, omega2, c_frict);
-    theta = theta_0 + rk_1[0] * dt / 2.0;
-    phi = phi_0 + rk_1[1] * dt / 2.0;
-    p = p_0 + rk_1[2] * dt / 2.0;
-    q = q_0 + rk_1[3] * dt / 2.0;
-
-    rk_2 = right_hand_side(theta, phi, p, q, omega2, c_frict);
-    theta = theta_0 + rk_2[0] * dt / 2.0;
-    phi = phi_0 + rk_2[1] * dt / 2.0;
-    p = p_0 + rk_2[2] * dt / 2.0;
-    q = q_0 + rk_2[3] * dt / 2.0;
-
-    rk_3 = right_hand_side(theta, phi, p, q, omega2, c_frict);
-    theta = theta_0 + rk_3[0] * dt;
-    phi = phi_0 + rk_3[1] * dt;
-    p = p_0 + rk_3[2] * dt;
-    q = q_0 + rk_3[3] * dt;
-
-    rk_4 = right_hand_side(theta, phi, p, q, omega2, c_frict);
-
-    theta = theta_0 + (rk_1[0] + 2.0 * rk_2[0] + 2.0 * rk_3[0] + rk_4[0]) * dt / 6.0;
-    phi = phi_0 + (rk_1[1] + 2.0 * rk_2[1] + 2.0 * rk_3[1] + rk_4[1]) * dt / 6.0;
-    p = p_0 + (rk_1[2] + 2.0 * rk_2[2] + 2.0 * rk_3[2] + rk_4[2]) * dt / 6.0;
-    q = q_0 + (rk_1[3] + 2.0 * rk_2[3] + 2.0 * rk_3[3] + rk_4[3]) * dt / 6.0;
-
-    if theta > 2.0 * PI {
-        theta = theta - 2.0 * PI
-    }
-    if theta < -2.0 * PI {
-        theta = theta + 2.0 * PI
-    }
-    if phi > 2.0 * PI {
-        phi = phi - 2.0 * PI
-    }
-    if phi < -2.0 * PI {
-        phi = phi + 2.0 * PI
-    }
-
-    let h = rk_1[4];
-    [theta, phi, p, q, h]
-}
-
 #[macroquad::main("Double Pendulum")]
 async fn main() {
     //make directory
@@ -323,19 +290,15 @@ async fn main() {
     let mut my_file = fs::File::create(file_path).expect("Error creating file");
 
     // column names
-    writeln!(my_file, "t theta phi p q c H").expect("Error writing to file");
+    writeln!(my_file, "t theta phi p q H").expect("Error writing to file");
 
     loop {
-        // pendulum parameters
-        let period = 2.0;
-        let omega = 2.0 * PI / period;
-        let omega2 = omega * omega;
-        // friction
-        let mut c_frict = 0.0;
-        let c_max = 1.0 / (FRICT * period);
+        let mut top_angle_deg = 90.0;
+        let mut bottom_angle_deg = 180.0;
+        let mut model = DynModel::new_dp(top_angle_deg, bottom_angle_deg);
 
         // time parameters
-        let tf = 1000.0 * period;
+        let tf = 1000.0;
         let dt_millis: u64 = 3;
         let dt = 0.001 * (dt_millis as f64);
         // frame time
@@ -347,15 +310,8 @@ async fn main() {
         let mut t_0 = 0.0;
         let mut t_draw = 0.0;
 
-        let mut theta_0 = 0.5 * PI;
-        let mut phi_0 = PI;
-        let theta_dot_0 = 0.0;
-        let phi_dot_0 = 0.0;
-        let mut p_0 = 2.0 * theta_dot_0 + phi_dot_0 * (theta_0 - phi_0).cos();
-        let mut q_0 = phi_dot_0 + theta_dot_0 * (theta_0 - phi_0).cos();
-
         //total energy
-        let mut h = right_hand_side(theta_0, phi_0, p_0, q_0, omega2, c_frict)[4];
+        let mut h = total_energy_dp(&model.vars, &model.pars);
 
         // draw the pendulum initial state
 
@@ -363,7 +319,7 @@ async fn main() {
             clear_background(SKYBLUE);
 
             let par = get_window_par(screen_height(), screen_width());
-            let coords = find_pendulum(theta_0, phi_0, par);
+            let coords = find_pendulum(model.vars.vec[0], model.vars.vec[1], par);
 
             draw_pendulum(coords, par);
 
@@ -378,7 +334,7 @@ async fn main() {
             );
 
             draw_text(
-                format!("Angle 1: {:.1} degrees.", angle_in_degrees(theta_0)).as_str(),
+                format!("Angle 1: {:.1} degrees.", angle_in_degrees(top_angle_deg)).as_str(),
                 5.0 * w,
                 6.0 * w,
                 2.5 * w,
@@ -386,7 +342,7 @@ async fn main() {
             );
 
             draw_text(
-                format!("Angle 2: {:.1} degrees.", angle_in_degrees(phi_0)).as_str(),
+                format!("Angle 2: {:.1} degrees.", angle_in_degrees(bottom_angle_deg)).as_str(),
                 5.0 * w,
                 9.0 * w,
                 2.5 * w,
@@ -402,14 +358,6 @@ async fn main() {
             );
 
             draw_text(
-                format!("Friction coefficient: {:.3}. Max is {}.", c_frict, c_max).as_str(),
-                5.0 * w,
-                2.0 * par[3] - 6.0 * w,
-                2.5 * w,
-                BLACK,
-            );
-
-            draw_text(
                 format!("Press [SPACE] to start.").as_str(),
                 5.0 * w,
                 2.0 * par[3] - 3.0 * w,
@@ -419,42 +367,24 @@ async fn main() {
 
             ft = get_frame_time() as f64;
 
-            if is_key_down(KeyCode::F) {
-                if c_frict < c_max {
-                    c_frict = c_frict + SPEED * ft / 20.0
-                } else {
-                    c_frict = c_max
-                };
-            }
-
-            if is_key_down(KeyCode::A) {
-                if c_frict > 0.0 {
-                    c_frict = c_frict - SPEED * ft / 20.0
-                } else {
-                    c_frict = 0.0
-                };
-            }
-
             if is_key_down(KeyCode::Left) {
-                theta_0 = theta_0 - SPEED * ft;
+                top_angle_deg = top_angle_deg - SPEED * ft;
             }
 
             if is_key_down(KeyCode::Right) {
-                theta_0 = theta_0 + SPEED * ft;
+                top_angle_deg = top_angle_deg + SPEED * ft;
             }
 
             if is_key_down(KeyCode::Down) {
-                phi_0 = phi_0 - SPEED * ft;
+                bottom_angle_deg = bottom_angle_deg - SPEED * ft;
             }
 
             if is_key_down(KeyCode::Up) {
-                phi_0 = phi_0 + SPEED * ft;
+                bottom_angle_deg = bottom_angle_deg + SPEED * ft;
             }
 
             next_frame().await;
         }
-
-        let mut solution: [f64; 5];
 
         // window parameters
         let mut par: [f32; 4];
@@ -462,7 +392,7 @@ async fn main() {
         let mut coords: [f32; 4];
 
         par = get_window_par(screen_height(), screen_width());
-        coords = find_pendulum(theta_0, phi_0, par);
+        coords = find_pendulum(model.vars.vec[0], model.vars.vec[1], par);
 
         // trail data
         let mut xy_mem = LinkedList::from([(coords[2], coords[3]); MEM]);
@@ -490,7 +420,7 @@ async fn main() {
                 par = get_window_par(screen_height(), screen_width());
                 w = par[1];
 
-                coords = find_pendulum(theta_0, phi_0, par);
+                coords = find_pendulum(model.vars.vec[0], model.vars.vec[1], par);
 
                 let xy_last = xy_mem.pop_back().unwrap();
 
@@ -498,46 +428,6 @@ async fn main() {
 
                 draw_trail(&xy_mem, xy_last, w);
                 draw_pendulum(coords, par);
-
-                if is_key_down(KeyCode::Left) {
-                    let delta = -5.0 * SPEED * ft;
-                    p_0 = p_0 + 2.0 * delta;
-                    q_0 = q_0 + delta * (theta_0 - phi_0).cos();
-                }
-
-                if is_key_down(KeyCode::Right) {
-                    let delta = 5.0 * SPEED * ft;
-                    p_0 = p_0 + 2.0 * delta;
-                    q_0 = q_0 + delta * (theta_0 - phi_0).cos();
-                }
-
-                if is_key_down(KeyCode::Down) {
-                    let delta = -5.0 * SPEED * ft;
-                    q_0 = q_0 + delta;
-                    p_0 = p_0 + delta * (theta_0 - phi_0).cos();
-                }
-
-                if is_key_down(KeyCode::Up) {
-                    let delta = 5.0 * SPEED * ft;
-                    q_0 = q_0 + delta;
-                    p_0 = p_0 + delta * (theta_0 - phi_0).cos();
-                }
-
-                if is_key_down(KeyCode::F) {
-                    if c_frict < c_max {
-                        c_frict = c_frict + SPEED * ft / 10.0
-                    } else {
-                        c_frict = c_max
-                    };
-                }
-
-                if is_key_down(KeyCode::A) {
-                    if c_frict > 0.0 {
-                        c_frict = c_frict - SPEED * ft / 10.0
-                    } else {
-                        c_frict = 0.0
-                    };
-                }
 
                 draw_text(
                     format!("Time elapsed, seconds: {:.3}", t_0).as_str(),
@@ -560,13 +450,7 @@ async fn main() {
                     2.0 * w,
                     BLACK,
                 );
-                draw_text(
-                    format!("Or use arrow keys to speed up the pendulum.").as_str(),
-                    par[2] + 10.0 * w,
-                    9.0 * w,
-                    2.0 * w,
-                    BLACK,
-                );
+
                 draw_text(
                     format!("FPS is {}", get_fps()).as_str(),
                     5.0 * w,
@@ -574,30 +458,15 @@ async fn main() {
                     2.0 * w,
                     BLACK,
                 );
-                draw_text(
-                    format!("Press [F]/[A] to increase/decrease friction.").as_str(),
-                    par[2] + 10.0 * w,
-                    3.0 * w,
-                    2.0 * w,
-                    BLACK,
-                );
-                draw_text(
-                    format!("Friction coefficient: {:.3}. Max is {}.", c_frict, c_max).as_str(),
-                    5.0 * w,
-                    3.0 * w,
-                    2.0 * w,
-                    BLACK,
-                );
 
                 writeln!(
                     my_file,
-                    "{} {} {} {} {} {} {}",
+                    "{} {} {} {} {} {}",
                     t_0,
-                    angle_in_degrees(theta_0),
-                    angle_in_degrees(phi_0),
-                    p_0,
-                    q_0,
-                    c_frict,
+                    angle_in_degrees(model.vars.vec[0]),
+                    angle_in_degrees(model.vars.vec[1]),
+                    model.vars.vec[2],
+                    model.vars.vec[3],
                     h
                 )
                 .expect("Error writing to file");
@@ -605,16 +474,9 @@ async fn main() {
                 next_frame().await;
             }
 
-            if h > 2000.0 {
-                c_frict = c_max
-            };
+            model.update_dp(dt);
 
-            solution = solve_equations(theta_0, phi_0, p_0, q_0, dt, omega2, c_frict);
-            theta_0 = solution[0];
-            phi_0 = solution[1];
-            p_0 = solution[2];
-            q_0 = solution[3];
-            h = solution[4]
+            h = total_energy_dp(&model.vars, &model.pars)
         }
     }
 }
