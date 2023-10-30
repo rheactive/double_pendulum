@@ -449,7 +449,7 @@ async fn main() {
 
                 egui_macroquad::ui(|egui_ctx| {
                     egui_ctx.set_pixels_per_point(1.5);
-                    let win = egui::Window::new("Set initial parameters");
+                    let win = egui::Window::new("Simulation monitor");
                     win.anchor(Align2::LEFT_TOP, [0.0, 0.0])
                         .show(egui_ctx, |ui| {
                             ui.label(format!("Time elapsed, seconds: {:.3}", t_0));
