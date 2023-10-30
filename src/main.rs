@@ -2,6 +2,7 @@
 
 use macroquad::prelude::*;
 use macroquad::color::Color;
+use egui_macroquad::egui::{self, Align2};
 
 use std::fs;
 use std::io::Write;
@@ -167,8 +168,8 @@ impl DynModel {
     }
 
     fn set_pen_vars(&mut self) {
-        self.pendula[0].angle = self.vars.vec[0];
-        self.pendula[1].angle = self.vars.vec[1];
+        self.pendula[0].angle = angle_round(self.vars.vec[0]);
+        self.pendula[1].angle = angle_round(self.vars.vec[1]);
         self.pendula[0].momentum = self.vars.vec[2];
         self.pendula[1].momentum = self.vars.vec[3];
         for j in 0..2 {
@@ -236,15 +237,16 @@ fn total_energy_dp(vars: &MyVec, pars: &Vec<f64>) -> f64 {
     h
 }
 
-fn get_window_par(height: f32, width: f32) -> [f32; 4] {
+fn get_window_par(height: f32, width: f32) -> [f32; 5] {
     let l = height / 5.0;
     let w = width / 100.0;
     let x0 = width / 2.0;
     let y0 = height / 2.0;
-    [l, w, x0, y0]
+    let s = width/1024.0;
+    [l, w, x0, y0, s]
 }
 
-fn find_pendulum(theta: f64, phi: f64, par: [f32; 4]) -> [f32; 4] {
+fn find_pendulum(theta: f64, phi: f64, par: [f32; 5]) -> [f32; 4] {
     // calculate pendulum positions
     let l = par[0];
     let x0 = par[2];
@@ -258,7 +260,7 @@ fn find_pendulum(theta: f64, phi: f64, par: [f32; 4]) -> [f32; 4] {
     [x1, y1, x2, y2]
 }
 
-fn draw_pendulum(coords: [f32; 4], par: [f32; 4]) {
+fn draw_pendulum(coords: [f32; 4], par: [f32; 5]) {
     // plot pendulum positions
     let w = par[1];
     let x0 = par[2];
@@ -292,7 +294,17 @@ fn draw_trail(xy_mem: &LinkedList<(f32, f32)>, xy_last: (f32, f32), w: f32) {
     draw_circle(xy_last.0, xy_last.1, w / 3.0, DARKPURPLE);
 }
 
-#[macroquad::main("Double Pendulum")]
+fn window_conf() -> Conf {
+    Conf {
+        window_title: "Double pendulum".to_owned(),
+        high_dpi: true,
+        window_width: 1024,
+        window_height: 768,
+        ..Default::default()
+    }
+}
+
+#[macroquad::main(window_conf)]
 async fn main() {
     //make directory
     //let dir_name = "dp_results";
@@ -307,6 +319,7 @@ async fn main() {
     writeln!(my_file, "time top_angle bottom_angle top_x top_y bottom_x bottom_y top_momentum bottom_momentum total_energy").expect("Error writing to file");
 
     loop {
+        let mut start_moving = false;
         let mut top_angle_deg = 120.0;
         let mut bottom_angle_deg = 180.0;
         let mut model = DynModel::new_dp(top_angle_deg, bottom_angle_deg);
@@ -330,7 +343,7 @@ async fn main() {
 
         // draw the pendulum initial state
 
-        while !is_key_down(KeyCode::Space) {
+        while !start_moving {
             clear_background(Color::from_rgba(135, 206, 235, 255));
 
             model = DynModel::new_dp(top_angle_deg, bottom_angle_deg);
@@ -340,40 +353,6 @@ async fn main() {
             let coords = find_pendulum(model.vars.vec[0], model.vars.vec[1], par);
 
             draw_pendulum(coords, par);
-
-            let w = par[1];
-
-            draw_text(
-                format!("Use left/right or up/down arrows to move the pendulum.").as_str(),
-                5.0 * w,
-                3.0 * w,
-                2.5 * w,
-                BLACK,
-            );
-
-            draw_text(
-                format!("Angle 1: {:.1} degrees.", top_angle_deg).as_str(),
-                5.0 * w,
-                6.0 * w,
-                2.5 * w,
-                BLACK,
-            );
-
-            draw_text(
-                format!("Angle 2: {:.1} degrees.", bottom_angle_deg).as_str(),
-                5.0 * w,
-                9.0 * w,
-                2.5 * w,
-                BLACK,
-            );
-
-            draw_text(
-                format!("Press [SPACE] to start.").as_str(),
-                5.0 * w,
-                2.0 * par[3] - 3.0 * w,
-                2.5 * w,
-                BLACK,
-            );
 
             ft = get_frame_time() as f64;
 
@@ -393,11 +372,38 @@ async fn main() {
                 bottom_angle_deg = bottom_angle_deg + SPEED * ft;
             }
 
+            //=================
+            //GUI
+            //=================
+
+            egui_macroquad::ui(|egui_ctx| {
+                egui_ctx.set_pixels_per_point(1.5);
+                let win = egui::Window::new("Set initial parameters");
+                    win.anchor(Align2::LEFT_TOP, [0.0, 0.0])
+                        .show(egui_ctx, |ui| {
+                        ui.label("Top angle:");
+                        ui.horizontal(|ui| {
+                            ui.add(egui::Slider::new(&mut top_angle_deg, 0.0..=359.0).text("°"));
+                        });
+                        ui.label("Bottom angle:");
+                        ui.horizontal(|ui| {
+                            ui.add(egui::Slider::new(&mut bottom_angle_deg, 0.0..=359.0).text("°"));
+                        });
+                        if ui.button("Start moving").clicked() {
+                            start_moving = true;
+                        }
+                    });
+            });
+    
+            // Draw things before egui
+    
+            egui_macroquad::draw();
+
             next_frame().await;
         }
 
         // window parameters
-        let mut par: [f32; 4];
+        let mut par: [f32; 5];
         let mut w: f32;
         let mut coords: [f32; 4];
 
@@ -409,7 +415,9 @@ async fn main() {
 
         //start the calculation
 
-        while t_0 < tf && !is_key_down(KeyCode::R) {
+        let mut stop_simulation = false;
+
+        while t_0 < tf && !stop_simulation {
             t_0 = t_0 + dt;
 
             ft = get_frame_time() as f64;
@@ -439,35 +447,25 @@ async fn main() {
                 draw_trail(&xy_mem, xy_last, w);
                 draw_pendulum(coords, par);
 
-                draw_text(
-                    format!("Time elapsed, seconds: {:.3}", t_0).as_str(),
-                    5.0 * w,
-                    3.0 * w,
-                    2.0 * w,
-                    BLACK,
-                );
-                draw_text(
-                    format!("Total energy, arb. units: {:.5}", h).as_str(),
-                    5.0 * w,
-                    6.0 * w,
-                    2.0 * w,
-                    BLACK,
-                );
-                draw_text(
-                    format!("Press [R] to reset the simulation!").as_str(),
-                    par[2] + 10.0 * w,
-                    3.0 * w,
-                    2.0 * w,
-                    BLACK,
-                );
-
-                draw_text(
-                    format!("FPS is {}", get_fps()).as_str(),
-                    5.0 * w,
-                    2.0 * par[3] - 3.0 * w,
-                    2.0 * w,
-                    BLACK,
-                );
+                egui_macroquad::ui(|egui_ctx| {
+                    egui_ctx.set_pixels_per_point(1.5);
+                    let win = egui::Window::new("Set initial parameters");
+                    win.anchor(Align2::LEFT_TOP, [0.0, 0.0])
+                        .show(egui_ctx, |ui| {
+                            ui.label(format!("Time elapsed, seconds: {:.3}", t_0));
+                            ui.label(format!("Top angle:  {:.1}°", model.pendula[0].angle_deg));
+                            ui.label(format!("Bottom angle:  {:.1}°", model.pendula[1].angle_deg));
+                            ui.label(format!("Total energy, arb. units: {:.5}", h));
+                            ui.label(format!("FPS:  {:.1}", get_fps()));
+                            if ui.button("Reset").clicked() {
+                                stop_simulation = true;
+                            }
+                        });
+                });
+        
+                // Draw things before egui
+        
+                egui_macroquad::draw();
 
                 writeln!(
                     my_file,
@@ -495,14 +493,26 @@ async fn main() {
     }
 }
 
-// express angle in degrees
+// express angle between 0 and 360 degrees 
 fn angle_in_degrees(angle: f64) -> f64 {
-    let in_degrees = angle * 180.0 / PI;
-    if in_degrees < 0.0 {
-        360.0 + in_degrees
-    } else if in_degrees > 360.0 {
-        -360.0 + in_degrees
-    } else {
-        in_degrees
+    let mut in_degrees = angle * 180.0 / PI;
+    while in_degrees < 0.0 {
+        in_degrees = 360.0 + in_degrees
+    } 
+    while in_degrees > 359.0 {
+        in_degrees = -360.0 + in_degrees
     }
+    in_degrees
+}
+
+// express angle between 0 and 360 degrees in radians
+fn angle_round(angle: f64) -> f64 {
+    let mut in_degrees = angle * 180.0 / PI;
+    while in_degrees < 0.0 {
+        in_degrees = 360.0 + in_degrees
+    } 
+    while in_degrees > 359.0 {
+        in_degrees = -360.0 + in_degrees
+    }
+    in_degrees * PI / 180.0
 }
