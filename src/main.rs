@@ -1,4 +1,5 @@
 use macroquad::prelude::*;
+use macroquad::color::Color;
 
 use std::fs;
 use std::io::Write;
@@ -12,7 +13,7 @@ use std::vec::Vec;
 
 const FT_DESIRED: f64 = 0.01666666666667;
 const PI: f64 = std::f64::consts::PI;
-const SPEED: f64 = 1.0;
+const SPEED: f64 = 60.0;
 // trail parameter
 const MEM: usize = 50;
 // g
@@ -81,13 +82,11 @@ fn runge_kutta(
 
 #[derive(Clone)]
 struct Pendulum {
-    period: f64,
     omega2: f64,
     angle_deg: f64,
     angle: f64,
     momentum: f64,
     angle_dot: f64,
-    momentum_dot: f64,
     length: f64,
     base_vec: [f64; 2],
     ball_vec: [f64; 2],
@@ -102,13 +101,11 @@ impl Pendulum {
         let angle = angle_deg / 180.0 * PI;
         let length = G / omega2;
         Pendulum {
-            period,
             omega2,
             angle_deg,
             angle,
             momentum: 0.0,
             angle_dot: 0.0,
-            momentum_dot: 0.0,
             length,
             base_vec,
             ball_vec: [
@@ -153,6 +150,7 @@ impl DynModel {
 
     fn update_dp(&mut self, dt: f64) {
         self.vars = runge_kutta(&self.vars, &self.pars, &rhs_dp, dt);
+        self.set_pen_vars();
     }
 
     fn get_pen_vars(pendula: &Vec<Pendulum>) -> MyVec {
@@ -164,6 +162,20 @@ impl DynModel {
             vars.push(pend.momentum)
         }
         MyVec::new_from(&vars)
+    }
+
+    fn set_pen_vars(&mut self) {
+        self.pendula[0].angle = self.vars.vec[0];
+        self.pendula[1].angle = self.vars.vec[1];
+        self.pendula[0].momentum = self.vars.vec[2];
+        self.pendula[1].momentum = self.vars.vec[3];
+        for j in 0..2 {
+            self.pendula[j].angle_deg = angle_in_degrees(self.pendula[j].angle);
+            self.pendula[j].ball_vec = [
+            self.pendula[j].base_vec[0] + self.pendula[j].length * self.pendula[j].angle.sin(),
+            self.pendula[j].base_vec[1] - self.pendula[j].length * self.pendula[j].angle.cos(),
+        ];
+        }
     }
     
     fn get_pen_pars(pendula: &Vec<Pendulum>) -> Vec<f64> {
@@ -290,12 +302,13 @@ async fn main() {
     let mut my_file = fs::File::create(file_path).expect("Error creating file");
 
     // column names
-    writeln!(my_file, "t theta phi p q H").expect("Error writing to file");
+    writeln!(my_file, "time top_angle bottom_angle top_x top_y bottom_x bottom_y top_momentum bottom_momentum total_energy").expect("Error writing to file");
 
     loop {
-        let mut top_angle_deg = 90.0;
+        let mut top_angle_deg = 120.0;
         let mut bottom_angle_deg = 180.0;
         let mut model = DynModel::new_dp(top_angle_deg, bottom_angle_deg);
+        model.set_momenta_dp();
 
         // time parameters
         let tf = 1000.0;
@@ -316,7 +329,10 @@ async fn main() {
         // draw the pendulum initial state
 
         while !is_key_down(KeyCode::Space) {
-            clear_background(SKYBLUE);
+            clear_background(Color::from_rgba(135, 206, 235, 255));
+
+            model = DynModel::new_dp(top_angle_deg, bottom_angle_deg);
+            model.set_momenta_dp();
 
             let par = get_window_par(screen_height(), screen_width());
             let coords = find_pendulum(model.vars.vec[0], model.vars.vec[1], par);
@@ -334,7 +350,7 @@ async fn main() {
             );
 
             draw_text(
-                format!("Angle 1: {:.1} degrees.", angle_in_degrees(top_angle_deg)).as_str(),
+                format!("Angle 1: {:.1} degrees.", top_angle_deg).as_str(),
                 5.0 * w,
                 6.0 * w,
                 2.5 * w,
@@ -342,17 +358,9 @@ async fn main() {
             );
 
             draw_text(
-                format!("Angle 2: {:.1} degrees.", angle_in_degrees(bottom_angle_deg)).as_str(),
+                format!("Angle 2: {:.1} degrees.", bottom_angle_deg).as_str(),
                 5.0 * w,
                 9.0 * w,
-                2.5 * w,
-                BLACK,
-            );
-
-            draw_text(
-                format!("Press [F]/[A] to increase/decrease friction.").as_str(),
-                5.0 * w,
-                2.0 * par[3] - 9.0 * w,
                 2.5 * w,
                 BLACK,
             );
@@ -415,7 +423,7 @@ async fn main() {
 
                 t_draw = t_0;
 
-                clear_background(SKYBLUE);
+                clear_background(Color::from_rgba(135, 206, 235, 255));
 
                 par = get_window_par(screen_height(), screen_width());
                 w = par[1];
@@ -432,21 +440,21 @@ async fn main() {
                 draw_text(
                     format!("Time elapsed, seconds: {:.3}", t_0).as_str(),
                     5.0 * w,
-                    6.0 * w,
+                    3.0 * w,
                     2.0 * w,
                     BLACK,
                 );
                 draw_text(
                     format!("Total energy, arb. units: {:.5}", h).as_str(),
                     5.0 * w,
-                    9.0 * w,
+                    6.0 * w,
                     2.0 * w,
                     BLACK,
                 );
                 draw_text(
                     format!("Press [R] to reset the simulation!").as_str(),
                     par[2] + 10.0 * w,
-                    6.0 * w,
+                    3.0 * w,
                     2.0 * w,
                     BLACK,
                 );
@@ -461,10 +469,14 @@ async fn main() {
 
                 writeln!(
                     my_file,
-                    "{} {} {} {} {} {}",
+                    "{} {} {} {} {} {} {} {} {} {}",
                     t_0,
                     angle_in_degrees(model.vars.vec[0]),
                     angle_in_degrees(model.vars.vec[1]),
+                    model.pendula[0].ball_vec[0],
+                    model.pendula[0].ball_vec[1],
+                    model.pendula[1].ball_vec[0],
+                    model.pendula[1].ball_vec[1],
                     model.vars.vec[2],
                     model.vars.vec[3],
                     h
