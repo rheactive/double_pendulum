@@ -1,3 +1,5 @@
+// #![windows_subsystem = "windows"]
+
 use macroquad::prelude::*;
 use macroquad::color::Color;
 
@@ -376,11 +378,11 @@ async fn main() {
             ft = get_frame_time() as f64;
 
             if is_key_down(KeyCode::Left) {
-                top_angle_deg = top_angle_deg - SPEED * ft;
+                top_angle_deg = top_angle_deg + SPEED * ft;
             }
 
             if is_key_down(KeyCode::Right) {
-                top_angle_deg = top_angle_deg + SPEED * ft;
+                top_angle_deg = top_angle_deg - SPEED * ft;
             }
 
             if is_key_down(KeyCode::Down) {
